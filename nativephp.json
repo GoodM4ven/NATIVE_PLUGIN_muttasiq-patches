@@ -1,0 +1,12 @@
+{
+    "namespace": "MuttasiqPatches",
+    "hooks": {
+        "pre_compile": "nativephp:muttasiq:patches"
+    },
+    "android": {
+        "min_version": 33
+    },
+    "ios": {
+        "min_version": "18.0"
+    }
+}

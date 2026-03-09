@@ -1,0 +1,49 @@
+{
+    "name": "goodm4ven/nativephp-muttasiq-patches",
+    "description": "Internal NativePHP Mobile Android build patches used by Muttasiq.",
+    "type": "nativephp-plugin",
+    "version": "1.0.0",
+    "license": "AGPL-3.0-only",
+    "keywords": [
+        "nativephp",
+        "nativephp-plugin",
+        "laravel",
+        "android",
+        "livewire",
+        "filament",
+        "muttasiq"
+    ],
+    "homepage": "https://github.com/GoodM4ven/nativephp-muttasiq-patches",
+    "support": {
+        "issues": "https://github.com/GoodM4ven/nativephp-muttasiq-patches/issues",
+        "source": "https://github.com/GoodM4ven/nativephp-muttasiq-patches",
+        "email": "goodm4ven@proton.me"
+    },
+    "authors": [
+        {
+            "name": "GoodM4ven",
+            "email": "goodm4ven@proton.me",
+            "homepage": "https://github.com/GoodM4ven",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "nativephp/mobile": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Goodm4ven\\NativePatches\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Goodm4ven\\NativePatches\\NativePatchesServiceProvider"
+            ]
+        },
+        "nativephp": {
+            "manifest": "nativephp.json"
+        }
+    }
+}
