@@ -606,8 +606,15 @@ KOTLIN;
                     "catch (e) { return false; } })();"
 
             webView.evaluateJavascript(js) { value ->
-                val handled = value?.trim()?.trim('\"') == "true"
+                val normalized = value?.trim()?.trim('\"')
+                val handled = normalized == "true"
+                val shouldExit = normalized == "exit"
                 if (handled) {
+                    return@evaluateJavascript
+                }
+
+                if (shouldExit) {
+                    finish()
                     return@evaluateJavascript
                 }
 
