@@ -2,7 +2,6 @@
     "name": "goodm4ven/nativephp-muttasiq-patches",
     "description": "Internal NativePHP Mobile Android build patches used by Muttasiq.",
     "type": "nativephp-plugin",
-    "version": "1.0.0",
     "license": "AGPL-3.0-only",
     "keywords": [
         "nativephp",
