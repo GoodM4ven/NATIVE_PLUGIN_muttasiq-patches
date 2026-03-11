@@ -51,6 +51,14 @@ class ApplyNativePatchesCommand extends NativePluginHookCommand
             $hadErrors = true;
         }
 
+        $laravelEnvironmentPath = $buildPath.'/app/src/main/java/com/nativephp/mobile/bridge/LaravelEnvironment.kt';
+        try {
+            $this->patchLaravelEnvironment($laravelEnvironmentPath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
         return $hadErrors ? self::FAILURE : self::SUCCESS;
     }
 
@@ -1129,6 +1137,74 @@ KOTLIN;
         $changed = $changed || $updated;
 
         $this->writePatchResult($path, $text, $changed, 'native-request-capture');
+    }
+
+    private function patchLaravelEnvironment(string $path): void
+    {
+        if (! file_exists($path)) {
+            $this->info("[native-bundle-extract] skip missing: {$path}");
+
+            return;
+        }
+
+        $text = file_get_contents($path);
+        if ($text === false) {
+            throw new RuntimeException("[native-bundle-extract] error: unable to read {$path}");
+        }
+
+        $changed = false;
+
+        $changed = $this->removeLine(
+            $text,
+            "import kotlinx.coroutines.*\n",
+        ) || $changed;
+
+        $unzipBody = <<<'KOTLIN'
+val buffer = ByteArray(65536)
+ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
+    var ze: ZipEntry? = zis.nextEntry
+
+    while (ze != null) {
+        // Skip storage directory - we use persisted_data/storage instead
+        if (ze.name.startsWith("storage/") || ze.name == "storage") {
+            Log.d(TAG, "⏭️ Skipping storage directory from bundle: ${ze.name}")
+            zis.closeEntry()
+            ze = zis.nextEntry
+            continue
+        }
+
+        val file = File(destinationDir, ze.name)
+        val destinationRoot = destinationDir.canonicalPath + File.separator
+        val destinationFile = file.canonicalPath
+
+        // Prevent zip-slip path traversal
+        if (!destinationFile.startsWith(destinationRoot)) {
+            throw SecurityException("Blocked ZIP entry outside extraction dir: ${ze.name}")
+        }
+
+        if (ze.isDirectory) {
+            file.mkdirs()
+        } else {
+            file.parentFile?.mkdirs()
+            FileOutputStream(file).use { fos ->
+                var count: Int
+                while (zis.read(buffer).also { count = it } != -1) {
+                    fos.write(buffer, 0, count)
+                }
+                fos.flush()
+            }
+        }
+
+        zis.closeEntry()
+        ze = zis.nextEntry
+    }
+}
+KOTLIN;
+
+        [$text, $updated] = $this->setKotlinFunctionBody($text, 'unzip', $unzipBody);
+        $changed = $changed || $updated;
+
+        $this->writePatchResult($path, $text, $changed, 'native-bundle-extract');
     }
 
     private function buildKotlinFunctionDefinition(

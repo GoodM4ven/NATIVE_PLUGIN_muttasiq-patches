@@ -12,6 +12,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Applies the required `EDGE` patches in `nativephp/mobile` so empty navigation components are not rendered and nested native component trees are preserved correctly.
 - Patches `MainActivity.kt` to improve system bars, `safe-area` injection, native back handling, and WebView state behavior.
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, avoiding lost request bodies caused by late JavaScript injection.
+- Patches `LaravelEnvironment.kt` bundle extraction to stream ZIP entries directly to disk (instead of buffering large files in memory), preventing first-launch `OutOfMemoryError` during Laravel bundle extraction.
 - Runs as a NativePHP `pre_compile` hook, so separate shell patch scripts are no longer needed during builds.
 
 ### Patches
@@ -21,6 +22,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-back-handler`: upgrades native back button delegation so it can cooperate with the app's navigation logic.
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
+- `native-bundle-extract`: patches `LaravelEnvironment.kt` unzip behavior to use streaming extraction with ZIP slip protection.
 
 
 ## Installation
