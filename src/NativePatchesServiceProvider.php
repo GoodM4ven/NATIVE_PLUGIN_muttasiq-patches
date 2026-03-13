@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Goodm4ven\NativePatches;
 
-use Goodm4ven\NativePatches\Commands\ApplyNativePatchesCommand;
+use Goodm4ven\NativePatches\Commands\ApplyAndroidPatchesCommand;
+use Goodm4ven\NativePatches\Commands\ApplyIosPatchesCommand;
+use Goodm4ven\NativePatches\Commands\RunNativePatchesCommand;
 use Illuminate\Support\ServiceProvider;
 
 class NativePatchesServiceProvider extends ServiceProvider
@@ -16,7 +18,9 @@ class NativePatchesServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                ApplyNativePatchesCommand::class,
+                RunNativePatchesCommand::class,
+                ApplyAndroidPatchesCommand::class,
+                ApplyIosPatchesCommand::class,
             ]);
         }
     }

@@ -3,7 +3,7 @@
 
 # NativePHP Muttasiq Patches
 
-An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_muttasiq-dot-com)** that applies the Android build patches required on top of `nativephp/mobile` during NativePHP builds.
+An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_muttasiq-dot-com)** that applies the NativePHP build patches required on top of `nativephp/mobile` during Android and iOS builds.
 
 **This package is not meant to be a broad, general-purpose plugin.** It is a small compatibility layer for Muttasiq that replaces manual patch scripts with an official NativePHP plugin hook.
 
@@ -13,6 +13,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Patches `MainActivity.kt` to improve system bars, `safe-area` injection, native back handling, and WebView state behavior.
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, avoiding lost request bodies caused by late JavaScript injection.
 - Patches `LaravelEnvironment.kt` bundle extraction to stream ZIP entries directly to disk (instead of buffering large files in memory), preventing first-launch `OutOfMemoryError` during Laravel bundle extraction.
+- Patches iOS `ContentView.swift` to keep Muttasiq's edge-swipe back handling aligned with the app's in-web navigation behavior, while warning if upstream system UI layout expectations change.
 - Runs as a NativePHP `pre_compile` hook, so separate shell patch scripts are no longer needed during builds.
 
 ### Patches
@@ -23,6 +24,8 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
 - `native-bundle-extract`: patches `LaravelEnvironment.kt` unzip behavior to use streaming extraction with ZIP slip protection.
+- `native-ios-system-ui`: verifies the upstream iOS layout structure still exposes the top and bottom native chrome that Muttasiq expects.
+- `native-ios-back`: patches `ContentView.swift` so the native left-edge gesture delegates to the app's web back action before falling back to WebView history.
 
 
 ## Installation
@@ -38,22 +41,32 @@ php artisan native:plugin:register goodm4ven/nativephp-muttasiq-patches --no-int
 
 This package does not expose a `Facade`, `bridge functions`, or native events for app-level consumption. It is a build-time plugin only.
 
-Once registered, NativePHP will invoke the following command automatically during builds:
+Once registered, NativePHP will invoke the following dispatcher automatically during builds:
 
 ```bash
 php artisan nativephp:muttasiq:patches
 ```
 
-That command is wired through the `pre_compile` hook declared in `nativephp.json`.
+That dispatcher is wired through the `pre_compile` hook declared in `nativephp.json`, and forwards to the platform-specific commands:
+
+```bash
+php artisan nativephp:muttasiq:patches-android
+php artisan nativephp:muttasiq:patches-ios
+```
 
 
 ## Development
 
-If you are developing this package locally alongside the main app, wire it into the project as a path repository or local Composer dependency, then rebuild the Android project:
+If you are developing this package locally alongside the main app, wire it into the project as a path repository or local Composer dependency, then rebuild the native project you need:
 
 ```bash
 php artisan native:install android --force --no-interaction
 php artisan native:run android
+```
+
+```bash
+php artisan native:install ios --force --no-interaction
+php artisan native:run ios
 ```
 
 </div>
