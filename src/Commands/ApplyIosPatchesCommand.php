@@ -7,6 +7,7 @@ namespace Goodm4ven\NativePatches\Commands;
 use Goodm4ven\NativePatches\Commands\Concerns\InteractsWithPatchFiles;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesEdgeComponents;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosContentView;
+use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosNativePhpApp;
 use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
 use RuntimeException;
 
@@ -15,6 +16,7 @@ class ApplyIosPatchesCommand extends NativePluginHookCommand
     use InteractsWithPatchFiles;
     use PatchesEdgeComponents;
     use PatchesIosContentView;
+    use PatchesIosNativePhpApp;
 
     protected $signature = 'nativephp:muttasiq:patches-ios';
 
@@ -53,6 +55,15 @@ class ApplyIosPatchesCommand extends NativePluginHookCommand
 
         try {
             $this->patchIosBackHandler($contentViewPath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
+        $nativePhpAppPath = $buildPath.'/NativePHP/NativePHPApp.swift';
+
+        try {
+            $this->patchIosNativePhpApp($nativePhpAppPath);
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
             $hadErrors = true;
