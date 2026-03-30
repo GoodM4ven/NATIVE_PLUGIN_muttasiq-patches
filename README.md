@@ -14,8 +14,10 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, avoiding lost request bodies caused by late JavaScript injection.
 - Patches `PHPWebViewClient.kt` so Muttasiq's Quran page fonts are streamed directly from the bundled raw-data files, and binary asset misses no longer fall back through the unsafe JNI string bridge.
 - Patches `LaravelEnvironment.kt` bundle extraction to stream ZIP entries directly to disk (instead of buffering large files in memory), preventing first-launch `OutOfMemoryError` during Laravel bundle extraction.
+- Patches native bootstrap so first-launch setup can defer Muttasiq's heavy Quran data migrations until the user explicitly opens the Quran section.
 - Patches iOS `ContentView.swift` to keep Muttasiq's edge-swipe back handling aligned with the app's in-web navigation behavior, while warning if upstream system UI layout expectations change.
-- Patches iOS `NativePHPApp.swift` so native startup always exposes the sqlite runtime environment, and classic/fallback startup paths still run migrations before the first request.
+- Patches iOS `NativePHPApp.swift` and `AppUpdateManager.swift` so native startup and app updates stay on sqlite and use the app-specific bootstrap command instead of raw `migrate --force`.
+- Patches `MainActivity.kt` with a small JavaScript bridge so Muttasiq can opt into Quran page navigation via the Android hardware volume buttons.
 - Keeps patch anchors tolerant of upstream engine refactors where possible, including Compose modifier-chain changes in `MainActivity.kt`.
 - Runs as a NativePHP `pre_compile` hook, so separate shell patch scripts are no longer needed during builds.
 
@@ -27,10 +29,12 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
 - `native-android-assets`: resolves Quran page fonts directly from the bundled raw-data tree and blocks binary-asset PHP fallback that would otherwise crash Android on `NewStringUTF`.
-- `native-bundle-extract`: patches `LaravelEnvironment.kt` unzip behavior to use streaming extraction with ZIP slip protection.
+- `native-bundle-extract`: patches `LaravelEnvironment.kt` unzip behavior to use streaming extraction with ZIP slip protection, and swaps raw `migrate --force` for `app:native-bootstrap --no-interaction`.
 - `native-ios-system-ui`: verifies the upstream iOS layout structure still exposes the top and bottom native chrome that Muttasiq expects.
 - `native-ios-back`: patches `ContentView.swift` so the native left-edge gesture delegates to the app's web back action before falling back to WebView history.
 - `native-ios-db-bootstrap`: patches `NativePHPApp.swift` so iOS startup and embedded artisan execution stay on sqlite, and classic/fallback startup paths still run migrations before serving requests.
+- `native-ios-app-updates`: patches `AppUpdateManager.swift` so app updates also use the app-specific bootstrap command.
+- `native-quran-volume-buttons`: patches `MainActivity.kt` so Muttasiq can enable Android hardware volume keys for Quran page navigation only while the reader is active.
 
 
 ## iOS SQLite startup fix

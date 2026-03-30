@@ -25,6 +25,13 @@ trait PatchesAndroidMainActivity
 
         $changed = false;
 
+        $changed = $this->insertImport(
+            $text,
+            'import android.view.KeyEvent',
+            'import android.view.ViewGroup',
+            'MainActivity volume key import',
+        ) || $changed;
+
         $fieldPattern = '/(    private var pendingInsets: Insets\? = null\n)(?!    private var lastStableInsets: Insets\? = null\n)/m';
         if (preg_match($fieldPattern, $text) === 1) {
             $text = preg_replace($fieldPattern, "$1    private var lastStableInsets: Insets? = null\n", $text, 1);
@@ -44,6 +51,19 @@ trait PatchesAndroidMainActivity
             $changed = true;
         } elseif (! str_contains($text, "    private var isMainActivityDestroyed = false\n")) {
             throw new RuntimeException('[native-system-ui] error: pattern not found for lifecycle destroyed flag');
+        }
+
+        $volumeFieldPattern = '/(    private var showSplash by mutableStateOf\(true\)\n)(?!    @Volatile\n    private var isQuranVolumeNavigationEnabled = false\n)/m';
+        if (preg_match($volumeFieldPattern, $text) === 1) {
+            $text = preg_replace(
+                $volumeFieldPattern,
+                "    private var showSplash by mutableStateOf(true)\n    @Volatile\n    private var isQuranVolumeNavigationEnabled = false\n",
+                $text,
+                1,
+            );
+            $changed = true;
+        } elseif (! str_contains($text, "    private var isQuranVolumeNavigationEnabled = false\n")) {
+            throw new RuntimeException('[native-system-ui] error: pattern not found for Quran volume navigation flag');
         }
 
         $companionOriginal = <<<'KOTLIN'
@@ -131,6 +151,54 @@ KOTLIN;
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'injectSafeAreaInsetsToWebView', $injectSafeAreaBody);
         $changed = $changed || $updated;
 
+        $volumeDispatchBlock = <<<'KOTLIN'
+    private fun dispatchQuranVolumeButton(direction: String) {
+        val escapedDirection = direction
+            .replace("\\", "\\\\")
+            .replace("'", "\\'")
+
+        val jsCode = """
+            (function() {
+                const payload = { direction: '$escapedDirection' };
+
+                window.dispatchEvent(new CustomEvent('quran-native-volume-button', {
+                    detail: payload,
+                }));
+
+                if (window.Native && typeof window.Native.dispatch === 'function') {
+                    window.Native.dispatch('quran-volume-button', payload);
+                }
+            })();
+        """.trimIndent()
+
+        webView.evaluateJavascript(jsCode, null)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isQuranVolumeNavigationEnabled) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    dispatchQuranVolumeButton("previous")
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    dispatchQuranVolumeButton("next")
+                    return true
+                }
+            }
+        }
+
+        return super.onKeyDown(keyCode, event)
+    }
+KOTLIN;
+
+        $changed = $this->insertBeforeOrError(
+            $text,
+            '    private fun initializeEnvironmentAsync(onReady: () -> Unit) {',
+            rtrim($volumeDispatchBlock, "\n"),
+            'Quran volume key bridge',
+        ) || $changed;
+
         $initializeEnvironmentBody = <<<'KOTLIN'
 Thread {
     Log.d("LaravelInit", "📦 Starting async Laravel extraction...")
@@ -172,7 +240,25 @@ Thread {
             return@Thread
         }
 
-        Log.d("LaravelInit", "✅ Laravel environment ready — continuing")
+        Log.d("LaravelInit", "Laravel environment ready")
+
+        val runtimeMode = LaravelEnvironment.getRuntimeMode(this)
+        Log.d("LaravelInit", "Runtime mode: $runtimeMode")
+
+        if (runtimeMode == "classic") {
+            Log.d("LaravelInit", "Classic mode configured — skipping persistent runtime boot")
+        } else {
+            val bootStart = System.currentTimeMillis()
+            val booted = phpBridge.bootPersistentRuntime()
+            val bootTime = System.currentTimeMillis() - bootStart
+
+            if (booted) {
+                Log.d("LaravelInit", "Persistent runtime booted in ${bootTime}ms — requests will skip init/shutdown")
+                queueWorker = PHPQueueWorker(phpBridge).also { it.start() }
+            } else {
+                Log.w("LaravelInit", "Persistent runtime boot failed after ${bootTime}ms — falling back to classic mode")
+            }
+        }
 
         Handler(Looper.getMainLooper()).post {
             if (isMainActivityDestroyed || isFinishing || isDestroyed || supportFragmentManager.isDestroyed) {
@@ -218,6 +304,12 @@ if (::webViewManager.isInitialized) {
 // Stop hot reload watcher thread
 shouldStopWatcher = true
 hotReloadWatcherThread?.interrupt()
+
+queueWorker?.stop()
+
+if (phpBridge.isPersistentMode()) {
+    phpBridge.shutdownPersistentRuntime()
+}
 
 if (::laravelEnv.isInitialized) {
     laravelEnv.cleanup()
@@ -450,6 +542,28 @@ KOTLIN;
 
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'configureStatusBar', $configureStatusBarBody);
         $changed = $changed || $updated;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            <<<'KOTLIN'
+    inner class AndroidBridge {
+        @android.webkit.JavascriptInterface
+        fun openDrawer() {
+KOTLIN,
+            <<<'KOTLIN'
+    inner class AndroidBridge {
+        @android.webkit.JavascriptInterface
+        fun setQuranVolumeNavigationEnabled(enabled: Boolean) {
+            isQuranVolumeNavigationEnabled = enabled
+            Log.d("AndroidBridge", "Quran volume navigation enabled=$enabled")
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openDrawer() {
+KOTLIN,
+            'AndroidBridge Quran volume setter',
+            'fun setQuranVolumeNavigationEnabled(enabled: Boolean)',
+        ) || $changed;
 
         if ($changed) {
             file_put_contents($path, $text);

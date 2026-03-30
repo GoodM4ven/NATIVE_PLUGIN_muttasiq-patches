@@ -6,6 +6,7 @@ namespace Goodm4ven\NativePatches\Commands;
 
 use Goodm4ven\NativePatches\Commands\Concerns\InteractsWithPatchFiles;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesEdgeComponents;
+use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosAppUpdateManager;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosContentView;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosNativePhpApp;
 use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
@@ -15,6 +16,7 @@ class ApplyIosPatchesCommand extends NativePluginHookCommand
 {
     use InteractsWithPatchFiles;
     use PatchesEdgeComponents;
+    use PatchesIosAppUpdateManager;
     use PatchesIosContentView;
     use PatchesIosNativePhpApp;
 
@@ -64,6 +66,15 @@ class ApplyIosPatchesCommand extends NativePluginHookCommand
 
         try {
             $this->patchIosNativePhpApp($nativePhpAppPath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
+        $appUpdateManagerPath = $buildPath.'/NativePHP/AppUpdateManager.swift';
+
+        try {
+            $this->patchIosAppUpdateManager($appUpdateManagerPath);
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
             $hadErrors = true;

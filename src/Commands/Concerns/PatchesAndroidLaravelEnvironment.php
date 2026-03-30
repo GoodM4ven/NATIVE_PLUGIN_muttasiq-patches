@@ -73,6 +73,29 @@ KOTLIN;
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'unzip', $unzipBody);
         $changed = $changed || $updated;
 
+        $runBaseArtisanCommandsBody = <<<'KOTLIN'
+val dbFile = File(appStorageDir, "persisted_data/database/database.sqlite")
+if (!dbFile.exists()) {
+    Log.d(TAG, "📄 Creating empty SQLite file: ${dbFile.absolutePath}")
+    dbFile.createNewFile()
+} else {
+    Log.d(TAG, "✅ SQLite file already exists: ${dbFile.absolutePath}")
+}
+
+File(appStorageDir, "persisted_data/storage/app/public")
+phpBridge.runArtisanCommand("optimize:clear")
+phpBridge.runArtisanCommand("storage:unlink")
+phpBridge.runArtisanCommand("storage:link")
+phpBridge.runArtisanCommand("app:native-bootstrap --no-interaction")
+KOTLIN;
+
+        [$text, $updated] = $this->setKotlinFunctionBody(
+            $text,
+            'runBaseArtisanCommands',
+            $runBaseArtisanCommandsBody,
+        );
+        $changed = $changed || $updated;
+
         $this->writePatchResult($path, $text, $changed, 'native-bundle-extract');
     }
 }

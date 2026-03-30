@@ -105,6 +105,29 @@ SWIFT,
             'artisan migrate START (persistent fallback)',
         ) || $changed;
 
+        $changed = $this->replaceOnceOrError(
+            $text,
+            <<<'SWIFT'
+                    NSLog("[NativePHP] artisan migrate START (post-extraction)")
+                    _ = PersistentPHPRuntime.shared.artisan(command: "migrate --force")
+                    NSLog("[NativePHP] artisan migrate DONE")
+SWIFT,
+            <<<'SWIFT'
+                    NSLog("[NativePHP] artisan migrate START (post-extraction)")
+                    _ = PersistentPHPRuntime.shared.artisan(command: "app:native-bootstrap --no-interaction")
+                    NSLog("[NativePHP] artisan migrate DONE")
+SWIFT,
+            'iOS persistent post-extraction bootstrap command',
+            'app:native-bootstrap --no-interaction',
+        ) || $changed;
+
+        [$text, $updated] = $this->setSwiftFunctionBody(
+            $text,
+            'migrateDatabase',
+            '_ = artisan(additionalArgs: ["app:native-bootstrap", "--no-interaction"])',
+        );
+        $changed = $changed || $updated;
+
         $this->writePatchResult($path, $text, $changed, 'native-ios-db-bootstrap');
     }
 }

@@ -124,12 +124,14 @@ return WebResourceResponse(
 KOTLIN;
 
         $resolveBundledAssetFileBody = <<<'KOTLIN'
-val laravelPublicPath = phpBridge.getLaravelPublicPath()
+val laravelRootPath = phpBridge.getLaravelRootPath().trimEnd('/')
 val possiblePaths = listOf(
-    "$laravelPublicPath/$path",
-    "$laravelPublicPath/$cleanPath",
-    "$laravelPublicPath/vendor/$cleanPath",
-    "$laravelPublicPath/build/$cleanPath",
+    "$laravelRootPath/public/$path",
+    "$laravelRootPath/public/$cleanPath",
+    "$laravelRootPath/public/vendor/$cleanPath",
+    "$laravelRootPath/public/build/$cleanPath",
+    "$laravelRootPath/$path",
+    "$laravelRootPath/$cleanPath",
 )
 
 Log.d(TAG, "🔍 Checking paths: ${possiblePaths.joinToString()}")
