@@ -45,6 +45,11 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
      */
     private ?array $bundledLaravelManifestVendors = null;
 
+    /**
+     * @var array<string, bool>|null
+     */
+    private ?array $bundledLaravelAutoloadFileVendors = null;
+
     public function handle(): int
     {
         if (! $this->isAndroid()) {
@@ -226,7 +231,8 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
             return false;
         }
 
-        return $this->bundledLaravelManifestVendors()[$vendorName] ?? false;
+        return ($this->bundledLaravelManifestVendors()[$vendorName] ?? false)
+            || ($this->bundledLaravelAutoloadFileVendors()[$vendorName] ?? false);
     }
 
     /**
@@ -258,6 +264,45 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         }
 
         return $this->bundledLaravelManifestVendors = $vendors;
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function bundledLaravelAutoloadFileVendors(): array
+    {
+        if (is_array($this->bundledLaravelAutoloadFileVendors)) {
+            return $this->bundledLaravelAutoloadFileVendors;
+        }
+
+        $autoloadFilesPath = base_path('vendor/composer/autoload_files.php');
+        if (! is_file($autoloadFilesPath)) {
+            return $this->bundledLaravelAutoloadFileVendors = [];
+        }
+
+        /** @var array<string, string> $autoloadFiles */
+        $autoloadFiles = require $autoloadFilesPath;
+
+        $vendors = [];
+
+        foreach ($autoloadFiles as $autoloadFile) {
+            if (! is_string($autoloadFile)) {
+                continue;
+            }
+
+            if (! preg_match('#/vendor/([^/]+)/[^/]+/#', $autoloadFile, $matches)) {
+                continue;
+            }
+
+            $vendorName = (string) ($matches[1] ?? '');
+            if ($vendorName === '') {
+                continue;
+            }
+
+            $vendors[$vendorName] = true;
+        }
+
+        return $this->bundledLaravelAutoloadFileVendors = $vendors;
     }
 
     private function copyArchiveEntryToTemporaryFile(ZipArchive $archive, string $entryName): string
