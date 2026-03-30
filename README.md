@@ -16,6 +16,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Includes route-aware Android Quran font interception for `qpc-v2-fonts`, `quran-surah-header-font`, and supported `quran-basmallah-font/*` requests so those font responses never flow through the PHP JNI string bridge.
 - Patches `LaravelEnvironment.kt` bundle extraction to stream ZIP entries directly to disk (instead of buffering large files in memory), preventing first-launch `OutOfMemoryError` during Laravel bundle extraction.
 - Rewrites Android's `laravel_bundle.zip` after NativePHP builds it so dormant Quran exegesis data and dead dev-only vendor trees are removed before the APK is packaged, cutting first-launch extraction work.
+- Bundle pruning now respects Laravel's cached package manifest so runtime-registered providers are not stripped accidentally from the Android archive.
 - Skips extracting the dormant Quran exegesis database bundle on Android first launch as a second line of defense when older or unpruned bundles are still present.
 - Patches native bootstrap so first-launch setup can defer Muttasiq's heavy Quran data migrations until the user explicitly opens the Quran section.
 - Patches iOS `ContentView.swift` to keep Muttasiq's edge-swipe back handling aligned with the app's in-web navigation behavior, while warning if upstream system UI layout expectations change.
