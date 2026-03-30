@@ -55,12 +55,11 @@ trait PatchesIosContentView
             $changed = true;
         }
 
-        $changed = $this->replaceOnceOrError(
+        $changed = $this->insertImport(
             $text,
+            'import UIKit',
             "import WebKit\n",
-            "import WebKit\nimport UIKit\n",
             'iOS UIKit import',
-            "import UIKit\n",
         ) || $changed;
 
         $changed = $this->replaceOnceOrError(

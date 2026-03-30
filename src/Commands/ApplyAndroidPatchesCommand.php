@@ -7,6 +7,7 @@ namespace Goodm4ven\NativePatches\Commands;
 use Goodm4ven\NativePatches\Commands\Concerns\InteractsWithPatchFiles;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidLaravelEnvironment;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidMainActivity;
+use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidPhpWebViewClient;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidWebViewManager;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesEdgeComponents;
 use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
@@ -17,6 +18,7 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
     use InteractsWithPatchFiles;
     use PatchesAndroidLaravelEnvironment;
     use PatchesAndroidMainActivity;
+    use PatchesAndroidPhpWebViewClient;
     use PatchesAndroidWebViewManager;
     use PatchesEdgeComponents;
 
@@ -57,6 +59,14 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $webViewManagerPath = $buildPath.'/app/src/main/java/com/nativephp/mobile/network/WebViewManager.kt';
         try {
             $this->patchWebViewManager($webViewManagerPath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
+        $phpWebViewClientPath = $buildPath.'/app/src/main/java/com/nativephp/mobile/network/PHPWebViewClient.kt';
+        try {
+            $this->patchPhpWebViewClient($phpWebViewClientPath);
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
             $hadErrors = true;

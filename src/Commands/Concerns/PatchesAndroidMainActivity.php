@@ -23,42 +23,7 @@ trait PatchesAndroidMainActivity
 
         $changed = false;
 
-        $systemUiBody = <<<'KOTLIN'
-val windowInsetsController = WindowInsetsControllerCompat(window, window.decorView)
-
-val isSystemDarkMode = (resources.configuration.uiMode and
-    Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-
-val systemBarColor = if (isSystemDarkMode) {
-    android.graphics.Color.BLACK
-} else {
-    android.graphics.Color.WHITE
-}
-
-// Use opaque, system-themed bars so web content doesn't bleed into system UI
-window.statusBarColor = systemBarColor
-window.navigationBarColor = systemBarColor
-
-// Always match system light/dark for icon contrast
-windowInsetsController.isAppearanceLightStatusBars = !isSystemDarkMode
-windowInsetsController.isAppearanceLightNavigationBars = !isSystemDarkMode
-
-Log.d(
-    "StatusBar",
-    "System bars style: auto (system ${if (isSystemDarkMode) "dark" else "light"} mode, requested=$statusBarStyle)"
-)
-KOTLIN;
-
-        [$text, $updated] = $this->setKotlinFunctionBody($text, 'configureStatusBar', $systemUiBody);
-        $changed = $updated;
-
-        $changed = $this->replaceOnceOrError(
-            $text,
-            'For edge-to-edge mode, system bars are transparent to allow content to draw behind them',
-            'For edge-to-edge mode, system bars follow the system light/dark theme so content does not bleed through',
-            'status bar docstring',
-            'SystemBarsScrim',
-        ) || $changed;
+        $changed = false;
 
         $fieldPattern = '/(    private var pendingInsets: Insets\? = null\n)(?!    private var lastStableInsets: Insets\? = null\n)/m';
         if (preg_match($fieldPattern, $text) === 1) {
@@ -274,18 +239,20 @@ KOTLIN;
             $hotReloadNew,
         ) || $changed;
 
-        $changed = $this->replaceOnceOrError(
+        $changed = $this->replaceRegexOnceOrError(
             $text,
-            "            settings.mediaPlaybackRequiresUserGesture = false\n",
-            "            settings.mediaPlaybackRequiresUserGesture = false\n            isSaveEnabled = false\n",
+            '(            settings\.mediaPlaybackRequiresUserGesture = false\n)(?!            isSaveEnabled = false\n)',
+            "$1            isSaveEnabled = false\n",
             'WebView state saving',
             '            isSaveEnabled = false',
         ) || $changed;
 
-        $changed = $this->replaceOnceOrError(
+        $changed = $this->replaceRegexOnceOrError(
             $text,
-            "                        AndroidView(\n                            factory = { webView },\n                            modifier = Modifier\n                                .fillMaxSize()\n                                .padding(paddingValues)\n                                .windowInsetsPadding(WindowInsets.ime),\n",
-            "                        AndroidView(\n                            factory = { webView },\n                            modifier = Modifier\n                                .fillMaxSize()\n                                .padding(paddingValues)\n                                .windowInsetsPadding(WindowInsets.systemBars)\n                                .windowInsetsPadding(WindowInsets.ime),\n",
+            <<<'REGEX'
+                        AndroidView\(\n\s+factory = \{ webView \},\n\s+modifier = Modifier\n\s+\.fillMaxSize\(\)\n\s+\.padding\(paddingValues\)\n(\s+\.consumeWindowInsets\(paddingValues\)\n)?\s+\.windowInsetsPadding\(WindowInsets\.ime\),\n
+REGEX,
+            "                        AndroidView(\n                            factory = { webView },\n                            modifier = Modifier\n                                .fillMaxSize()\n                                .padding(paddingValues)\n$1                                .windowInsetsPadding(WindowInsets.systemBars)\n                                .windowInsetsPadding(WindowInsets.ime),\n",
             'AndroidView system bars inset',
             '                                .windowInsetsPadding(WindowInsets.systemBars)',
         ) || $changed;
@@ -341,10 +308,6 @@ KOTLIN;
                 rtrim($definition, "\n"),
                 'SystemBarsScrim definition',
             ) || $changed;
-        }
-
-        if (str_contains($text, 'android.graphics.Color.TRANSPARENT')) {
-            $this->info("[native-system-ui] warning: transparent system bars still present in {$path}");
         }
 
         $this->writePatchResult($path, $text, $changed, 'native-system-ui');
@@ -447,13 +410,27 @@ KOTLIN;
             "    @Suppress(\"DEPRECATION\")\n",
         ) || $changed;
 
-        $changed = $this->replaceOnceOrError(
+        $finalConfigureStatusBarDocstring = '     * For edge-to-edge mode, we rely on the SystemBarsScrim for background and only set icon contrast'."\n";
+
+        $updatedConfigureStatusBarDocstring = $this->replaceOnceOrError(
             $text,
-            '     * For edge-to-edge mode, system bars follow the system light/dark theme so content does not bleed through'."\n",
-            '     * For edge-to-edge mode, we rely on the SystemBarsScrim for background and only set icon contrast'."\n",
+            '     * For edge-to-edge mode, system bars are transparent to allow content to draw behind them'."\n",
+            $finalConfigureStatusBarDocstring,
             'configureStatusBar docstring',
-            'SystemBarsScrim',
-        ) || $changed;
+            $finalConfigureStatusBarDocstring,
+        );
+
+        if (! $updatedConfigureStatusBarDocstring) {
+            $updatedConfigureStatusBarDocstring = $this->replaceOnceOrError(
+                $text,
+                '     * For edge-to-edge mode, system bars follow the system light/dark theme so content does not bleed through'."\n",
+                $finalConfigureStatusBarDocstring,
+                'configureStatusBar docstring',
+                $finalConfigureStatusBarDocstring,
+            );
+        }
+
+        $changed = $updatedConfigureStatusBarDocstring || $changed;
 
         $configureStatusBarBody = <<<'KOTLIN'
 val windowInsetsController = WindowInsetsControllerCompat(window, window.decorView)

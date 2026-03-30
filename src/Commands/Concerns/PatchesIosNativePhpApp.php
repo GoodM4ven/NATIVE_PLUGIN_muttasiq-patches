@@ -26,14 +26,40 @@ trait PatchesIosNativePhpApp
         $changed = $this->replaceOnceOrError(
             $text,
             <<<'SWIFT'
+        setenv("LARAVEL_STORAGE_PATH", storageDir, 1)
+        setenv("VIEW_COMPILED_PATH", viewCacheDir, 1)
+        setenv("DB_DATABASE", "\(databaseDir)/database.sqlite", 1)
+
+        // Set APP_KEY from secure storage (generates on first run)
+SWIFT,
+            <<<'SWIFT'
+        setenv("LARAVEL_STORAGE_PATH", storageDir, 1)
+        setenv("VIEW_COMPILED_PATH", viewCacheDir, 1)
+        setenv("DB_DATABASE", "\(databaseDir)/database.sqlite", 1)
+        setenv("DB_CONNECTION", "sqlite", 1)
+        setenv("NATIVEPHP_RUNNING", "true", 1)
+
+        // Set APP_KEY from secure storage (generates on first run)
+SWIFT,
+            'iOS sqlite runtime environment',
+            'setenv("DB_CONNECTION", "sqlite", 1)',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            <<<'SWIFT'
         setenv("PHP_SELF", "artisan.php", 1)
         setenv("APP_RUNNING_IN_CONSOLE", "true", 1)
+
+        let additionalCArgs = additionalArgs.map { strdup($0) }
 SWIFT,
             <<<'SWIFT'
         setenv("PHP_SELF", "artisan.php", 1)
         setenv("APP_RUNNING_IN_CONSOLE", "true", 1)
         setenv("NATIVEPHP_RUNNING", "true", 1)
         setenv("DB_CONNECTION", "sqlite", 1)
+
+        let additionalCArgs = additionalArgs.map { strdup($0) }
 SWIFT,
             'iOS artisan sqlite runtime env',
             'setenv("DB_CONNECTION", "sqlite", 1)',
@@ -42,25 +68,41 @@ SWIFT,
         $changed = $this->replaceOnceOrError(
             $text,
             <<<'SWIFT'
-        // 3. Create storage symlink
-        DebugLogger.shared.log("📱 Deferred init: creating storage symlink")
-        createStorageLink()
-
-        // 4. Execute plugin initialization callbacks (on main thread)
+            NSLog("[NativePHP] Classic mode configured — skipping persistent runtime boot")
+            booted = false
+            createStorageLink()
+        } else {
 SWIFT,
             <<<'SWIFT'
-        // 3. Create storage symlink
-        DebugLogger.shared.log("📱 Deferred init: creating storage symlink")
-        createStorageLink()
-
-        // 4. Ensure sqlite schema is up to date for native runtime
-        DebugLogger.shared.log("📱 Deferred init: running migrations")
-        migrateDatabase()
-
-        // 5. Execute plugin initialization callbacks (on main thread)
+            NSLog("[NativePHP] Classic mode configured — skipping persistent runtime boot")
+            booted = false
+            createStorageLink()
+            NSLog("[NativePHP] artisan migrate START (classic mode)")
+            migrateDatabase()
+            NSLog("[NativePHP] artisan migrate DONE")
+        } else {
 SWIFT,
-            'iOS deferred migration bootstrap',
-            'DebugLogger.shared.log("📱 Deferred init: running migrations")',
+            'iOS classic mode migration bootstrap',
+            'artisan migrate START (classic mode)',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            <<<'SWIFT'
+                NSLog("[NativePHP] persistent boot failed, falling back to classic mode")
+                createStorageLink()
+            }
+SWIFT,
+            <<<'SWIFT'
+                NSLog("[NativePHP] persistent boot failed, falling back to classic mode")
+                createStorageLink()
+                NSLog("[NativePHP] artisan migrate START (persistent fallback)")
+                migrateDatabase()
+                NSLog("[NativePHP] artisan migrate DONE")
+            }
+SWIFT,
+            'iOS persistent fallback migration bootstrap',
+            'artisan migrate START (persistent fallback)',
         ) || $changed;
 
         $this->writePatchResult($path, $text, $changed, 'native-ios-db-bootstrap');
