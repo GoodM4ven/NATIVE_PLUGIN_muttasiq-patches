@@ -7,6 +7,7 @@ namespace Goodm4ven\NativePatches\Commands;
 use Goodm4ven\NativePatches\Commands\Concerns\InteractsWithPatchFiles;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidLaravelEnvironment;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidMainActivity;
+use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidPhpBridge;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidPhpWebViewClient;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidWebViewManager;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesEdgeComponents;
@@ -19,6 +20,7 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
     use InteractsWithPatchFiles;
     use PatchesAndroidLaravelEnvironment;
     use PatchesAndroidMainActivity;
+    use PatchesAndroidPhpBridge;
     use PatchesAndroidPhpWebViewClient;
     use PatchesAndroidWebViewManager;
     use PatchesEdgeComponents;
@@ -86,6 +88,14 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $phpWebViewClientPath = $buildPath.'/app/src/main/java/com/nativephp/mobile/network/PHPWebViewClient.kt';
         try {
             $this->patchPhpWebViewClient($phpWebViewClientPath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
+        $phpBridgePath = $buildPath.'/app/src/main/java/com/nativephp/mobile/bridge/PHPBridge.kt';
+        try {
+            $this->patchPhpBridge($phpBridgePath);
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
             $hadErrors = true;

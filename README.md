@@ -12,6 +12,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Applies the required `EDGE` patches in `nativephp/mobile` so empty navigation components are not rendered and nested native component trees are preserved correctly.
 - Patches `MainActivity.kt` to improve system bars, `safe-area` injection, native back handling, and WebView state behavior.
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, avoiding lost request bodies caused by late JavaScript injection.
+- Patches `PHPBridge.kt` to validate that persistent runtime boot is actually usable before enabling persistent mode, and auto-fallbacks to classic request handling if runtime boot state is lost.
 - Patches `PHPWebViewClient.kt` so Muttasiq's Quran page fonts are streamed directly from the bundled raw-data files, and binary asset misses no longer fall back through the unsafe JNI string bridge.
 - Includes route-aware Android Quran font interception for `qpc-v2-fonts`, `quran-surah-header-font`, and supported `quran-basmallah-font/*` requests so those font responses never flow through the PHP JNI string bridge.
 - Patches `LaravelEnvironment.kt` bundle extraction to stream ZIP entries directly to disk (instead of buffering large files in memory), preventing first-launch `OutOfMemoryError` during Laravel bundle extraction.
@@ -32,6 +33,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-back-handler`: upgrades native back button delegation so it can cooperate with the app's navigation logic.
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
+- `native-persistent-runtime-guard`: verifies persistent runtime readiness after boot, and degrades to classic handling if Android ever returns `Runtime not booted` during persistent dispatch.
 - `native-android-assets`: resolves Quran page fonts directly from the bundled raw-data tree and blocks binary-asset PHP fallback that would otherwise crash Android on `NewStringUTF`.
 - `native-android-assets`: also resolves the route-backed Quran header and supported basmallah font endpoints from the bundled raw-data tree to avoid JNI crashes on binary font responses.
 - `native-bundle-extract`: prunes Android's generated `laravel_bundle.zip` before packaging, patches `LaravelEnvironment.kt` unzip behavior to use streaming extraction with ZIP slip protection, skips extracting the dormant Quran exegesis bundle as a runtime fallback, and swaps raw `migrate --force` for `app:native-bootstrap --no-interaction`.
