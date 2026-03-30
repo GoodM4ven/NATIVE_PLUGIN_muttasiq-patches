@@ -34,6 +34,8 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         'vendor/goodm4ven/arabicable/resources/raw-data/quran/exegesis/',
     ];
 
+    private const BUNDLED_BUILD_ASSET_PREFIX = 'public/build/assets/';
+
     public function handle(): int
     {
         if (! $this->isAndroid()) {
@@ -115,6 +117,8 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
             throw new RuntimeException("Laravel bundle archive is missing at [{$archivePath}].");
         }
 
+        $retainedBuildAssetEntries = $this->retainedBundledBuildAssetEntries();
+
         $originalArchive = new ZipArchive;
         if ($originalArchive->open($archivePath) !== true) {
             throw new RuntimeException("Unable to open Laravel bundle archive at [{$archivePath}].");
@@ -133,6 +137,8 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $temporaryFiles = [];
         $removedEntriesCount = 0;
         $removedEntriesSize = 0;
+        $removedDormantQuranEntriesCount = 0;
+        $removedStaleBuildEntriesCount = 0;
 
         try {
             for ($index = 0; $index < $originalArchive->numFiles; $index++) {
@@ -143,9 +149,19 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
                     continue;
                 }
 
-                if ($this->shouldPruneBundledLaravelArchiveEntry($entryName)) {
+                $pruneReason = $this->bundledLaravelArchivePruneReason($entryName, $retainedBuildAssetEntries);
+
+                if ($pruneReason !== null) {
                     $removedEntriesCount++;
                     $removedEntriesSize += (int) ($stat['size'] ?? 0);
+
+                    if ($pruneReason === 'dormant-quran-exegesis') {
+                        $removedDormantQuranEntriesCount++;
+                    }
+
+                    if ($pruneReason === 'stale-build-asset') {
+                        $removedStaleBuildEntriesCount++;
+                    }
 
                     continue;
                 }
@@ -186,18 +202,93 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         }
 
         $removedEntriesSizeInMegabytes = number_format($removedEntriesSize / 1024 / 1024, 2);
-        $this->info("Pruned {$removedEntriesCount} dormant Laravel bundle entries ({$removedEntriesSizeInMegabytes} MB) from [{$archivePath}].");
+        $this->info(
+            "Pruned {$removedEntriesCount} Laravel bundle entries ({$removedEntriesSizeInMegabytes} MB) from [{$archivePath}]"
+            ." [dormant-quran-exegesis={$removedDormantQuranEntriesCount}, stale-build-assets={$removedStaleBuildEntriesCount}].",
+        );
     }
 
-    private function shouldPruneBundledLaravelArchiveEntry(string $entryName): bool
+    /**
+     * @param  array<string, true>|null  $retainedBuildAssetEntries
+     */
+    private function bundledLaravelArchivePruneReason(string $entryName, ?array $retainedBuildAssetEntries): ?string
     {
         foreach (self::BUNDLED_LARAVEL_ARCHIVE_PRUNE_PREFIXES as $prefix) {
             if (str_starts_with($entryName, $prefix)) {
-                return true;
+                return 'dormant-quran-exegesis';
             }
         }
 
-        return false;
+        if (
+            $retainedBuildAssetEntries !== null
+            && str_starts_with($entryName, self::BUNDLED_BUILD_ASSET_PREFIX)
+            && ! isset($retainedBuildAssetEntries[$entryName])
+        ) {
+            return 'stale-build-asset';
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, true>|null
+     */
+    private function retainedBundledBuildAssetEntries(): ?array
+    {
+        $manifestPath = base_path('public/build/manifest.json');
+
+        if (! is_file($manifestPath)) {
+            return null;
+        }
+
+        try {
+            /** @var mixed $decodedManifest */
+            $decodedManifest = json_decode(file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! is_array($decodedManifest)) {
+            return null;
+        }
+
+        $retainedEntries = [];
+
+        foreach ($decodedManifest as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $this->retainBundledBuildAssetEntry($retainedEntries, $entry['file'] ?? null);
+
+            foreach ($entry['css'] ?? [] as $assetPath) {
+                $this->retainBundledBuildAssetEntry($retainedEntries, $assetPath);
+            }
+
+            foreach ($entry['assets'] ?? [] as $assetPath) {
+                $this->retainBundledBuildAssetEntry($retainedEntries, $assetPath);
+            }
+        }
+
+        return $retainedEntries;
+    }
+
+    /**
+     * @param  array<string, true>  $retainedEntries
+     */
+    private function retainBundledBuildAssetEntry(array &$retainedEntries, mixed $assetPath): void
+    {
+        if (! is_string($assetPath)) {
+            return;
+        }
+
+        $normalizedAssetPath = ltrim($assetPath, '/');
+
+        if ($normalizedAssetPath === '' || ! str_starts_with($normalizedAssetPath, 'assets/')) {
+            return;
+        }
+
+        $retainedEntries['public/build/'.$normalizedAssetPath] = true;
     }
 
     private function copyArchiveEntryToTemporaryFile(ZipArchive $archive, string $entryName): string

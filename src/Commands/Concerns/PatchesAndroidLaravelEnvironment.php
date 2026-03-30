@@ -87,11 +87,17 @@ KOTLIN;
 
 $runBaseArtisanCommandsBody = <<<'KOTLIN'
 val dbFile = File(appStorageDir, "persisted_data/database/database.sqlite")
+val bundledQuranSnapshotFile = File(appStorageDir, "database/native-quran-reader.sqlite")
 dbFile.parentFile?.mkdirs()
 
 if (!dbFile.exists() || dbFile.length() == 0L) {
-    Log.d(TAG, "📄 Creating empty SQLite file: ${dbFile.absolutePath}")
-    dbFile.createNewFile()
+    if (bundledQuranSnapshotFile.exists() && bundledQuranSnapshotFile.length() > 0L) {
+        Log.d(TAG, "📚 Seeding SQLite file from bundled native Quran snapshot: ${bundledQuranSnapshotFile.absolutePath}")
+        bundledQuranSnapshotFile.copyTo(dbFile, overwrite = true)
+    } else {
+        Log.d(TAG, "📄 Creating empty SQLite file: ${dbFile.absolutePath}")
+        dbFile.createNewFile()
+    }
 } else {
     Log.d(TAG, "✅ SQLite file already exists: ${dbFile.absolutePath}")
 }
