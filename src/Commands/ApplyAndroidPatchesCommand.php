@@ -31,24 +31,8 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
      * @var list<string>
      */
     private const BUNDLED_LARAVEL_ARCHIVE_PRUNE_PREFIXES = [
-        'vendor/fakerphp/',
         'vendor/goodm4ven/arabicable/resources/raw-data/quran/exegesis/',
-        'vendor/larastan/',
-        'vendor/mockery/',
-        'vendor/pestphp/',
-        'vendor/phpstan/',
-        'vendor/phpunit/',
     ];
-
-    /**
-     * @var array<string, bool>|null
-     */
-    private ?array $bundledLaravelManifestVendors = null;
-
-    /**
-     * @var array<string, bool>|null
-     */
-    private ?array $bundledLaravelAutoloadFileVendors = null;
 
     public function handle(): int
     {
@@ -209,100 +193,11 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
     {
         foreach (self::BUNDLED_LARAVEL_ARCHIVE_PRUNE_PREFIXES as $prefix) {
             if (str_starts_with($entryName, $prefix)) {
-                if ($this->shouldKeepBundledLaravelArchiveVendorPrefix($prefix)) {
-                    return false;
-                }
-
                 return true;
             }
         }
 
         return false;
-    }
-
-    private function shouldKeepBundledLaravelArchiveVendorPrefix(string $prefix): bool
-    {
-        if (! preg_match('#^vendor/([^/]+)/$#', $prefix, $matches)) {
-            return false;
-        }
-
-        $vendorName = (string) ($matches[1] ?? '');
-        if ($vendorName === '') {
-            return false;
-        }
-
-        return ($this->bundledLaravelManifestVendors()[$vendorName] ?? false)
-            || ($this->bundledLaravelAutoloadFileVendors()[$vendorName] ?? false);
-    }
-
-    /**
-     * @return array<string, bool>
-     */
-    private function bundledLaravelManifestVendors(): array
-    {
-        if (is_array($this->bundledLaravelManifestVendors)) {
-            return $this->bundledLaravelManifestVendors;
-        }
-
-        $manifestPath = base_path('bootstrap/cache/packages.php');
-        if (! is_file($manifestPath)) {
-            return $this->bundledLaravelManifestVendors = [];
-        }
-
-        /** @var array<string, mixed> $packages */
-        $packages = require $manifestPath;
-
-        $vendors = [];
-
-        foreach (array_keys($packages) as $packageName) {
-            if (! is_string($packageName) || ! str_contains($packageName, '/')) {
-                continue;
-            }
-
-            [$vendorName] = explode('/', $packageName, 2);
-            $vendors[$vendorName] = true;
-        }
-
-        return $this->bundledLaravelManifestVendors = $vendors;
-    }
-
-    /**
-     * @return array<string, bool>
-     */
-    private function bundledLaravelAutoloadFileVendors(): array
-    {
-        if (is_array($this->bundledLaravelAutoloadFileVendors)) {
-            return $this->bundledLaravelAutoloadFileVendors;
-        }
-
-        $autoloadFilesPath = base_path('vendor/composer/autoload_files.php');
-        if (! is_file($autoloadFilesPath)) {
-            return $this->bundledLaravelAutoloadFileVendors = [];
-        }
-
-        /** @var array<string, string> $autoloadFiles */
-        $autoloadFiles = require $autoloadFilesPath;
-
-        $vendors = [];
-
-        foreach ($autoloadFiles as $autoloadFile) {
-            if (! is_string($autoloadFile)) {
-                continue;
-            }
-
-            if (! preg_match('#/vendor/([^/]+)/[^/]+/#', $autoloadFile, $matches)) {
-                continue;
-            }
-
-            $vendorName = (string) ($matches[1] ?? '');
-            if ($vendorName === '') {
-                continue;
-            }
-
-            $vendors[$vendorName] = true;
-        }
-
-        return $this->bundledLaravelAutoloadFileVendors = $vendors;
     }
 
     private function copyArchiveEntryToTemporaryFile(ZipArchive $archive, string $entryName): string
