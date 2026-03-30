@@ -28,7 +28,7 @@ trait PatchesAndroidLaravelEnvironment
             "import kotlinx.coroutines.*\n",
         );
 
-        $unzipBody = <<<'KOTLIN'
+$unzipBody = <<<'KOTLIN'
 val buffer = ByteArray(65536)
 ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
     var ze: ZipEntry? = zis.nextEntry
@@ -37,6 +37,18 @@ ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
         // Skip storage directory - we use persisted_data/storage instead
         if (ze.name.startsWith("storage/") || ze.name == "storage") {
             Log.d(TAG, "⏭️ Skipping storage directory from bundle: ${ze.name}")
+            zis.closeEntry()
+            ze = zis.nextEntry
+            continue
+        }
+
+        val skipsDormantQuranExegesis =
+            ze.name.startsWith("resources/raw-data/quran/exegesis/")
+                || ze.name.contains("/resources/raw-data/quran/exegesis/")
+                || ze.name.startsWith("vendor/goodm4ven/arabicable/resources/raw-data/quran/exegesis/")
+
+        if (skipsDormantQuranExegesis) {
+            Log.d(TAG, "⏭️ Skipping dormant Quran exegesis bundle entry: ${ze.name}")
             zis.closeEntry()
             ze = zis.nextEntry
             continue
@@ -75,9 +87,17 @@ KOTLIN;
 
         $runBaseArtisanCommandsBody = <<<'KOTLIN'
 val dbFile = File(appStorageDir, "persisted_data/database/database.sqlite")
-if (!dbFile.exists()) {
-    Log.d(TAG, "📄 Creating empty SQLite file: ${dbFile.absolutePath}")
-    dbFile.createNewFile()
+val bundledQuranSnapshot = File(appStorageDir, "laravel/database/native-quran-reader.sqlite")
+dbFile.parentFile?.mkdirs()
+
+if (!dbFile.exists() || dbFile.length() == 0L) {
+    if (bundledQuranSnapshot.exists() && bundledQuranSnapshot.length() > 0L) {
+        Log.d(TAG, "📚 Seeding SQLite file from bundled native Quran snapshot: ${bundledQuranSnapshot.absolutePath}")
+        bundledQuranSnapshot.copyTo(dbFile, overwrite = true)
+    } else {
+        Log.d(TAG, "📄 Creating empty SQLite file: ${dbFile.absolutePath}")
+        dbFile.createNewFile()
+    }
 } else {
     Log.d(TAG, "✅ SQLite file already exists: ${dbFile.absolutePath}")
 }
