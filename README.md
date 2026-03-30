@@ -13,6 +13,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Patches `MainActivity.kt` to improve system bars, `safe-area` injection, native back handling, and WebView state behavior.
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, avoiding lost request bodies caused by late JavaScript injection.
 - Patches `PHPWebViewClient.kt` so Muttasiq's Quran page fonts are streamed directly from the bundled raw-data files, and binary asset misses no longer fall back through the unsafe JNI string bridge.
+- Includes route-aware Android Quran font interception for `qpc-v2-fonts`, `quran-surah-header-font`, and supported `quran-basmallah-font/*` requests so those font responses never flow through the PHP JNI string bridge.
 - Patches `LaravelEnvironment.kt` bundle extraction to stream ZIP entries directly to disk (instead of buffering large files in memory), preventing first-launch `OutOfMemoryError` during Laravel bundle extraction.
 - Patches native bootstrap so first-launch setup can defer Muttasiq's heavy Quran data migrations until the user explicitly opens the Quran section.
 - Patches iOS `ContentView.swift` to keep Muttasiq's edge-swipe back handling aligned with the app's in-web navigation behavior, while warning if upstream system UI layout expectations change.
@@ -29,6 +30,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
 - `native-android-assets`: resolves Quran page fonts directly from the bundled raw-data tree and blocks binary-asset PHP fallback that would otherwise crash Android on `NewStringUTF`.
+- `native-android-assets`: also resolves the route-backed Quran header and supported basmallah font endpoints from the bundled raw-data tree to avoid JNI crashes on binary font responses.
 - `native-bundle-extract`: patches `LaravelEnvironment.kt` unzip behavior to use streaming extraction with ZIP slip protection, and swaps raw `migrate --force` for `app:native-bootstrap --no-interaction`.
 - `native-ios-system-ui`: verifies the upstream iOS layout structure still exposes the top and bottom native chrome that Muttasiq expects.
 - `native-ios-back`: patches `ContentView.swift` so the native left-edge gesture delegates to the app's web back action before falling back to WebView history.

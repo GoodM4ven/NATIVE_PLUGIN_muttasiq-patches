@@ -145,6 +145,7 @@ possiblePaths.firstOrNull { File(it).exists() }?.let { existingPath ->
 }
 
 return resolveBundledQpcFontFile(cleanPath)
+    ?: resolveBundledQuranRouteAsset(cleanPath)
 KOTLIN;
 
         $resolveBundledQpcFontFileBody = <<<'KOTLIN'
@@ -170,6 +171,40 @@ candidatePaths.firstOrNull { File(it).exists() }?.let { existingPath ->
     val mimeType = guessMimeType(fontFile.name)
 
     Log.d(TAG, "🕋 Resolved QPC page font directly from bundle: ${fontFile.absolutePath}")
+
+    return Pair(fontFile, mimeType)
+}
+
+return null
+KOTLIN;
+
+        $resolveBundledQuranRouteAssetBody = <<<'KOTLIN'
+val trimmedPath = cleanPath.trimStart('/')
+val laravelRootPath = phpBridge.getLaravelRootPath().trimEnd('/')
+val candidatePaths = when {
+    trimmedPath == "quran-surah-header-font" -> listOf(
+        "$laravelRootPath/resources/raw-data/quran/fonts/surah-headers/surah-name-v4.ttf",
+        "$laravelRootPath/../resources/raw-data/quran/fonts/surah-headers/surah-name-v4.ttf",
+        "$laravelRootPath/vendor/goodm4ven/arabicable/resources/raw-data/quran/fonts/surah-headers/surah-name-v4.ttf",
+    )
+    trimmedPath == "quran-basmallah-font/quran-common-ligature" -> listOf(
+        "$laravelRootPath/resources/raw-data/quran/fonts/surah-headers/quran-common.woff2",
+        "$laravelRootPath/../resources/raw-data/quran/fonts/surah-headers/quran-common.woff2",
+        "$laravelRootPath/vendor/goodm4ven/arabicable/resources/raw-data/quran/fonts/surah-headers/quran-common.woff2",
+    )
+    trimmedPath == "quran-basmallah-font/surah-names-v4" -> listOf(
+        "$laravelRootPath/resources/raw-data/quran/fonts/surah-headers/surah_names.woff2",
+        "$laravelRootPath/../resources/raw-data/quran/fonts/surah-headers/surah_names.woff2",
+        "$laravelRootPath/vendor/goodm4ven/arabicable/resources/raw-data/quran/fonts/surah-headers/surah_names.woff2",
+    )
+    else -> emptyList()
+}
+
+candidatePaths.firstOrNull { File(it).exists() }?.let { existingPath ->
+    val fontFile = File(existingPath)
+    val mimeType = guessMimeType(fontFile.name)
+
+    Log.d(TAG, "🕋 Resolved Quran route asset directly from bundle: ${fontFile.absolutePath}")
 
     return Pair(fontFile, mimeType)
 }
@@ -249,6 +284,22 @@ KOTLIN;
                 '    fun handlePHPRequest(',
                 rtrim($resolveBundledQpcFontFileDefinition, "\n"),
                 'resolveBundledQpcFontFile definition',
+            ) || $changed;
+        }
+
+        if (str_contains($text, 'private fun resolveBundledQuranRouteAsset(')) {
+            [$text, $updated] = $this->setKotlinFunctionBody($text, 'resolveBundledQuranRouteAsset', $resolveBundledQuranRouteAssetBody);
+            $changed = $changed || $updated;
+        } else {
+            $resolveBundledQuranRouteAssetDefinition = <<<'KOTLIN'
+    private fun resolveBundledQuranRouteAsset(cleanPath: String): Pair<File, String>? {
+KOTLIN;
+            $resolveBundledQuranRouteAssetDefinition .= "\n".$this->indentKotlinBody($resolveBundledQuranRouteAssetBody, '        ')."\n    }\n";
+            $changed = $this->insertBeforeOrError(
+                $text,
+                '    fun handlePHPRequest(',
+                rtrim($resolveBundledQuranRouteAssetDefinition, "\n"),
+                'resolveBundledQuranRouteAsset definition',
             ) || $changed;
         }
 
