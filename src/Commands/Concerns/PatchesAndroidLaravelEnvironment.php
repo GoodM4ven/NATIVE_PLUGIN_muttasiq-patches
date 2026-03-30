@@ -85,19 +85,13 @@ KOTLIN;
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'unzip', $unzipBody);
         $changed = $changed || $updated;
 
-        $runBaseArtisanCommandsBody = <<<'KOTLIN'
+$runBaseArtisanCommandsBody = <<<'KOTLIN'
 val dbFile = File(appStorageDir, "persisted_data/database/database.sqlite")
-val bundledQuranSnapshot = File(appStorageDir, "laravel/database/native-quran-reader.sqlite")
 dbFile.parentFile?.mkdirs()
 
 if (!dbFile.exists() || dbFile.length() == 0L) {
-    if (bundledQuranSnapshot.exists() && bundledQuranSnapshot.length() > 0L) {
-        Log.d(TAG, "📚 Seeding SQLite file from bundled native Quran snapshot: ${bundledQuranSnapshot.absolutePath}")
-        bundledQuranSnapshot.copyTo(dbFile, overwrite = true)
-    } else {
-        Log.d(TAG, "📄 Creating empty SQLite file: ${dbFile.absolutePath}")
-        dbFile.createNewFile()
-    }
+    Log.d(TAG, "📄 Creating empty SQLite file: ${dbFile.absolutePath}")
+    dbFile.createNewFile()
 } else {
     Log.d(TAG, "✅ SQLite file already exists: ${dbFile.absolutePath}")
 }
