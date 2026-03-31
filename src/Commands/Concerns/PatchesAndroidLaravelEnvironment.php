@@ -96,10 +96,11 @@ if (!dbFile.exists() || dbFile.length() == 0L) {
     Log.d(TAG, "✅ SQLite file already exists: ${dbFile.absolutePath}")
 }
 
-File(appStorageDir, "persisted_data/storage/app/public")
-phpBridge.runArtisanCommand("optimize:clear")
-phpBridge.runArtisanCommand("storage:unlink")
-phpBridge.runArtisanCommand("storage:link")
+val storagePublicDir = File(appStorageDir, "persisted_data/storage/app/public")
+if (!storagePublicDir.exists()) {
+    phpBridge.runArtisanCommand("storage:unlink")
+    phpBridge.runArtisanCommand("storage:link")
+}
 phpBridge.runArtisanCommand("app:native-bootstrap --no-interaction")
 KOTLIN;
 

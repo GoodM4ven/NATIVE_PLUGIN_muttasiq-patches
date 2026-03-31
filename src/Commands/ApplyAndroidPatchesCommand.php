@@ -32,6 +32,9 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
      */
     private const BUNDLED_LARAVEL_ARCHIVE_PRUNE_PREFIXES = [
         'vendor/goodm4ven/arabicable/resources/raw-data/quran/exegesis/',
+        'database/native-quran-reader.sqlite',
+        'database/native-quran-reader.sqlite.gz',
+        'database/native-quran-reader.json',
     ];
 
     private const BUNDLED_BUILD_ASSET_PREFIX = 'public/build/assets/';
