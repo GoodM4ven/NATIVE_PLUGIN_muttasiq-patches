@@ -110,6 +110,87 @@ KOTLIN;
         );
         $changed = $changed || $updated;
 
+        $endpointOverrideBlock = $this->androidNativeEndpointOverridesBlock();
+
+        if ($endpointOverrideBlock !== null) {
+            $changed = $this->replaceOnceOrError(
+                $text,
+                <<<'KOTLIN'
+"NATIVEPHP_TEMPDIR" to context.cacheDir.absolutePath
+            )
+KOTLIN,
+                <<<'KOTLIN'
+"NATIVEPHP_TEMPDIR" to context.cacheDir.absolutePath
+            )
+
+KOTLIN.$endpointOverrideBlock,
+                'native-runtime-endpoint-overrides',
+                $endpointOverrideBlock,
+            ) || $changed;
+        }
+
         $this->writePatchResult($path, $text, $changed, 'native-bundle-extract');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function androidNativeEndpointOverrides(): array
+    {
+        $endpointEnvironmentKeys = [
+            'NATIVE_ATHKAR_ENDPOINT',
+            'NATIVE_SETTINGS_ENDPOINT',
+            'NATIVE_QURAN_SNAPSHOT_META_ENDPOINT',
+            'NATIVE_QURAN_SNAPSHOT_DOWNLOAD_ENDPOINT',
+            'NATIVE_JS_ERROR_REPORTS_ENDPOINT',
+        ];
+
+        $overrides = [];
+
+        foreach ($endpointEnvironmentKeys as $key) {
+            $value = trim((string) getenv($key));
+
+            if ($value === '' || preg_match('/^https?:\/\//i', $value) !== 1) {
+                continue;
+            }
+
+            $overrides[$key] = $value;
+        }
+
+        return $overrides;
+    }
+
+    private function androidNativeEndpointOverridesBlock(): ?string
+    {
+        $endpointOverrides = $this->androidNativeEndpointOverrides();
+
+        if ($endpointOverrides === []) {
+            return null;
+        }
+
+        $lines = ['setEnvironmentVariables('];
+        $totalOverrides = count($endpointOverrides);
+        $index = 0;
+
+        foreach ($endpointOverrides as $key => $value) {
+            $index++;
+            $suffix = $index < $totalOverrides ? ',' : '';
+            $lines[] = '                "'.$key.'" to '.$this->kotlinStringLiteral($value).$suffix;
+        }
+
+        $lines[] = '            )';
+
+        return implode("\n", $lines);
+    }
+
+    private function kotlinStringLiteral(string $value): string
+    {
+        $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if (! is_string($encoded)) {
+            throw new RuntimeException('Unable to encode Kotlin string literal for Android endpoint override patch.');
+        }
+
+        return $encoded;
     }
 }
