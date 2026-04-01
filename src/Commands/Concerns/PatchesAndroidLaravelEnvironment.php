@@ -138,6 +138,10 @@ KOTLIN.$endpointOverrideBlock,
      */
     private function androidNativeEndpointOverrides(): array
     {
+        $overrides = [
+            'QUEUE_CONNECTION' => 'sync',
+        ];
+
         $endpointEnvironmentKeys = [
             'NATIVE_ATHKAR_ENDPOINT',
             'NATIVE_SETTINGS_ENDPOINT',
@@ -146,8 +150,6 @@ KOTLIN.$endpointOverrideBlock,
             'NATIVE_JS_ERROR_REPORTS_ENDPOINT',
         ];
 
-        $overrides = [];
-
         foreach ($endpointEnvironmentKeys as $key) {
             $value = trim((string) getenv($key));
 
@@ -155,10 +157,132 @@ KOTLIN.$endpointOverrideBlock,
                 continue;
             }
 
-            $overrides[$key] = $value;
+            $overrides[$key] = $this->normalizeAndroidEndpointOverride($value);
         }
 
         return $overrides;
+    }
+
+    private function normalizeAndroidEndpointOverride(string $url): string
+    {
+        if ($this->shouldKeepAndroidLoopbackEndpointOverrides()) {
+            return $url;
+        }
+
+        $parts = parse_url($url);
+
+        if (! is_array($parts)) {
+            return $url;
+        }
+
+        $host = strtolower((string) ($parts['host'] ?? ''));
+
+        if (! in_array($host, ['localhost', '127.0.0.1'], true)) {
+            return $url;
+        }
+
+        $lanIpv4 = $this->resolveLocalLanIpv4();
+
+        if ($lanIpv4 === null) {
+            return $url;
+        }
+
+        return $this->rebuildHttpUrlWithHost($parts, $lanIpv4);
+    }
+
+    private function shouldKeepAndroidLoopbackEndpointOverrides(): bool
+    {
+        $value = strtolower(trim((string) getenv('NATIVE_ANDROID_KEEP_LOOPBACK_ENDPOINTS')));
+
+        return in_array($value, ['1', 'true', 'yes', 'on'], true);
+    }
+
+    private function resolveLocalLanIpv4(): ?string
+    {
+        $explicitLanIpv4 = trim((string) getenv('NATIVE_QURAN_LOCAL_LAN_IP'));
+
+        if ($this->isLocalLanIpv4($explicitLanIpv4)) {
+            return $explicitLanIpv4;
+        }
+
+        $ipRouteOutput = trim((string) @shell_exec('ip route get 1.1.1.1 2>/dev/null'));
+
+        if ($ipRouteOutput !== '' && preg_match('/\bsrc\s+((?:\d{1,3}\.){3}\d{1,3})\b/', $ipRouteOutput, $matches) === 1) {
+            $candidate = trim((string) ($matches[1] ?? ''));
+
+            if ($this->isLocalLanIpv4($candidate)) {
+                return $candidate;
+            }
+        }
+
+        $hostIpsOutput = trim((string) @shell_exec('hostname -I 2>/dev/null'));
+
+        if ($hostIpsOutput === '') {
+            return null;
+        }
+
+        $candidates = preg_split('/\s+/', $hostIpsOutput) ?: [];
+
+        foreach ($candidates as $candidate) {
+            $normalizedCandidate = trim((string) $candidate);
+
+            if ($this->isLocalLanIpv4($normalizedCandidate)) {
+                return $normalizedCandidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function isLocalLanIpv4(string $candidate): bool
+    {
+        if (filter_var($candidate, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+            return false;
+        }
+
+        if (
+            str_starts_with($candidate, '10.')
+            || str_starts_with($candidate, '192.168.')
+            || str_starts_with($candidate, '169.254.')
+        ) {
+            return true;
+        }
+
+        if (preg_match('/^172\.(\d{1,2})\./', $candidate, $matches) !== 1) {
+            return false;
+        }
+
+        $secondOctet = (int) $matches[1];
+
+        return $secondOctet >= 16 && $secondOctet <= 31;
+    }
+
+    /**
+     * @param  array<string, int|string>  $parts
+     */
+    private function rebuildHttpUrlWithHost(array $parts, string $host): string
+    {
+        $scheme = strtolower((string) ($parts['scheme'] ?? 'http'));
+        $user = (string) ($parts['user'] ?? '');
+        $password = (string) ($parts['pass'] ?? '');
+        $auth = '';
+
+        if ($user !== '') {
+            $auth = $user;
+
+            if ($password !== '') {
+                $auth .= ':'.$password;
+            }
+
+            $auth .= '@';
+        }
+
+        $port = isset($parts['port']) ? ':'.(int) $parts['port'] : '';
+        $path = (string) ($parts['path'] ?? '/');
+        $query = isset($parts['query']) ? '?'.(string) $parts['query'] : '';
+        $fragment = isset($parts['fragment']) ? '#'.(string) $parts['fragment'] : '';
+
+        return "{$scheme}://{$auth}{$host}{$port}{$path}{$query}{$fragment}";
     }
 
     private function androidNativeEndpointOverridesBlock(): ?string
