@@ -113,6 +113,10 @@ KOTLIN;
 
         $endpointOverrideBlock = $this->androidNativeEndpointOverridesBlock();
 
+        $textWithoutLegacyOverrides = $this->stripLegacyAndroidNativeRuntimeOverrides($text);
+        $changed = $changed || $textWithoutLegacyOverrides !== $text;
+        $text = $textWithoutLegacyOverrides;
+
         if ($endpointOverrideBlock !== null) {
             $changed = $this->replaceOnceOrError(
                 $text,
@@ -126,9 +130,48 @@ KOTLIN,
 
 KOTLIN.$endpointOverrideBlock,
                 'native-runtime-endpoint-overrides',
-                $endpointOverrideBlock,
+                'NATIVE_QURAN_SNAPSHOT_DOWNLOAD_ENDPOINT',
             ) || $changed;
         }
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            '            Log.d(TAG, "✅ Environment variables configured")',
+            <<<'KOTLIN'
+            logMuttasiqNativeEnvironmentSummary()
+            Log.d(TAG, "✅ Environment variables configured")
+KOTLIN,
+            'native-runtime-environment-summary-call',
+            'logMuttasiqNativeEnvironmentSummary()',
+        ) || $changed;
+
+        $environmentSummaryBody = <<<'KOTLIN'
+val keys = listOf(
+    "QUEUE_CONNECTION",
+    "NATIVE_ANDROID_KEEP_LOOPBACK_ENDPOINTS",
+    "NATIVE_QURAN_LOCAL_LAN_IP",
+    "NATIVE_ATHKAR_ENDPOINT",
+    "NATIVE_SETTINGS_ENDPOINT",
+    "NATIVE_QURAN_SNAPSHOT_META_ENDPOINT",
+    "NATIVE_QURAN_SNAPSHOT_DOWNLOAD_ENDPOINT",
+    "NATIVE_JS_ERROR_REPORTS_ENDPOINT"
+)
+
+for (key in keys) {
+    val value = System.getenv(key)
+    val renderedValue = if (value.isNullOrBlank()) "<unset>" else value
+    Log.i(TAG, "🌐 Muttasiq native env [$key]=$renderedValue")
+}
+KOTLIN;
+
+        $changed = $this->insertBeforeOrError(
+            $text,
+            <<<'KOTLIN'
+    private fun setEnvironmentVariables(vararg pairs: Pair<String, String>) {
+KOTLIN,
+            $this->buildKotlinFunctionDefinition('logMuttasiqNativeEnvironmentSummary', $environmentSummaryBody),
+            'native-runtime-environment-summary-definition',
+        ) || $changed;
 
         $this->writePatchResult($path, $text, $changed, 'native-bundle-extract');
     }
@@ -140,7 +183,14 @@ KOTLIN.$endpointOverrideBlock,
     {
         $overrides = [
             'QUEUE_CONNECTION' => 'sync',
+            'NATIVE_ANDROID_KEEP_LOOPBACK_ENDPOINTS' => $this->shouldKeepAndroidLoopbackEndpointOverrides() ? '1' : '0',
         ];
+
+        $resolvedLanIpv4 = $this->resolveLocalLanIpv4();
+
+        if ($resolvedLanIpv4 !== null) {
+            $overrides['NATIVE_QURAN_LOCAL_LAN_IP'] = $resolvedLanIpv4;
+        }
 
         $endpointEnvironmentKeys = [
             'NATIVE_ATHKAR_ENDPOINT',
@@ -293,7 +343,7 @@ KOTLIN.$endpointOverrideBlock,
             return null;
         }
 
-        $lines = ['setEnvironmentVariables('];
+        $lines = ['            setEnvironmentVariables('];
         $totalOverrides = count($endpointOverrides);
         $index = 0;
 
@@ -306,6 +356,32 @@ KOTLIN.$endpointOverrideBlock,
         $lines[] = '            )';
 
         return implode("\n", $lines);
+    }
+
+    private function stripLegacyAndroidNativeRuntimeOverrides(string $text): string
+    {
+        $updatedText = preg_replace_callback(
+            '/^[ \t]*setEnvironmentVariables\(\n(?:[ \t]*"[^"]+" to [^\n]+\n)+[ \t]*\)\n/m',
+            static function (array $matches): string {
+                $block = (string) ($matches[0] ?? '');
+
+                if (
+                    ! str_contains($block, '"NATIVE_')
+                    && ! str_contains($block, '"QUEUE_CONNECTION" to "sync"')
+                ) {
+                    return $block;
+                }
+
+                return '';
+            },
+            $text,
+        );
+
+        if (! is_string($updatedText)) {
+            throw new RuntimeException('Unable to strip legacy Android native runtime override blocks.');
+        }
+
+        return $updatedText;
     }
 
     private function kotlinStringLiteral(string $value): string
