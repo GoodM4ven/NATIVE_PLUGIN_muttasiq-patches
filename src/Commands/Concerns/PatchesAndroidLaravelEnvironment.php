@@ -22,6 +22,7 @@ trait PatchesAndroidLaravelEnvironment
         }
 
         $changed = false;
+        $originalText = $text;
 
         $changed = $this->removeLine(
             $text,
@@ -134,16 +135,30 @@ KOTLIN.$endpointOverrideBlock,
             ) || $changed;
         }
 
-        $changed = $this->replaceOnceOrError(
+        $deduplicatedSummaryCalls = preg_replace(
+            '/^(?:[ \t]*logMuttasiqNativeEnvironmentSummary\(\)\R){2,}/m',
+            "            logMuttasiqNativeEnvironmentSummary()\n",
             $text,
-            '            Log.d(TAG, "✅ Environment variables configured")',
-            <<<'KOTLIN'
+            -1,
+            $deduplicatedSummaryCallCount,
+        );
+        if (! is_string($deduplicatedSummaryCalls)) {
+            throw new RuntimeException('Unable to deduplicate Android native environment summary calls.');
+        }
+        $text = $deduplicatedSummaryCalls;
+        $changed = $changed || $deduplicatedSummaryCallCount > 0;
+
+        if (! str_contains($text, 'logMuttasiqNativeEnvironmentSummary()')) {
+            $changed = $this->replaceOnceOrError(
+                $text,
+                '            Log.d(TAG, "✅ Environment variables configured")',
+                <<<'KOTLIN'
             logMuttasiqNativeEnvironmentSummary()
             Log.d(TAG, "✅ Environment variables configured")
 KOTLIN,
-            'native-runtime-environment-summary-call',
-            'logMuttasiqNativeEnvironmentSummary()',
-        ) || $changed;
+                'native-runtime-environment-summary-call',
+            ) || $changed;
+        }
 
         $environmentSummaryBody = <<<'KOTLIN'
 val keys = listOf(
@@ -172,6 +187,8 @@ KOTLIN,
             $this->buildKotlinFunctionDefinition('logMuttasiqNativeEnvironmentSummary', $environmentSummaryBody),
             'native-runtime-environment-summary-definition',
         ) || $changed;
+
+        $changed = $text !== $originalText;
 
         $this->writePatchResult($path, $text, $changed, 'native-bundle-extract');
     }

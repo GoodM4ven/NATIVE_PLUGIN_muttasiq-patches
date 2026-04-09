@@ -7,11 +7,16 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 
 **This package is not meant to be a broad, general-purpose plugin.** It is a small compatibility layer for Muttasiq that replaces manual patch scripts with an official NativePHP plugin hook.
 
+### Compatibility
+
+- NativePHP Mobile `3.2.x` (verified against `3.2.2`).
+- Patch anchors are maintained against the current `resources/androidstudio` and `resources/xcode` sources shipped by NativePHP Mobile 3.2.
+
 ### Objectives
 
 - Applies the required `EDGE` patches in `nativephp/mobile` so empty navigation components are not rendered and nested native component trees are preserved correctly.
 - Patches `MainActivity.kt` to improve system bars, `safe-area` injection, native back handling, and WebView state behavior.
-- Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, avoiding lost request bodies caused by late JavaScript injection.
+- Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, while preserving NativePHP 3.2 request-id forwarding (`X-NativePHP-Req-Id`) used by Android POST body replay.
 - Patches `PHPBridge.kt` to validate that persistent runtime boot is actually usable before enabling persistent mode, and auto-fallbacks to classic request handling if runtime boot state is lost.
 - Patches `PHPWebViewClient.kt` so Muttasiq's Quran page fonts are streamed directly from the bundled raw-data files, and binary asset misses no longer fall back through the unsafe JNI string bridge.
 - Includes route-aware Android Quran font interception for `qpc-v2-fonts`, `quran-surah-header-font`, and supported `quran-basmallah-font/*` requests so those font responses never flow through the PHP JNI string bridge.
@@ -23,6 +28,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Propagates optional build-time `NATIVE_*_ENDPOINT` overrides into Android runtime environment variables so local-source API broadcasts can be consumed by app HTTP jobs and startup sync, and auto-rewrites loopback overrides (`127.0.0.1` / `localhost`) to detected LAN IPv4 unless explicitly pinned.
 - Emits a concise Android runtime environment summary in `logcat` for queue + endpoint variables after NativePHP environment setup, so local broadcast endpoint issues are visible without digging through bundled files.
 - Patches `PHPQueueWorker.kt` to run `queue:work` in verbose mode and log queue command output, making native snapshot/import failures visible during Android debugging.
+- Keeps Android `LaravelEnvironment.kt` summary logging idempotent across repeated patch runs.
 - Patches iOS `ContentView.swift` to keep Muttasiq's edge-swipe back handling aligned with the app's in-web navigation behavior, while warning if upstream system UI layout expectations change.
 - Patches iOS `NativePHPApp.swift` and `AppUpdateManager.swift` so native startup and app updates stay on sqlite and use the app-specific bootstrap command instead of raw `migrate --force`.
 - Patches `MainActivity.kt` with a small JavaScript bridge so Muttasiq can opt into Quran page navigation via the Android hardware volume buttons.

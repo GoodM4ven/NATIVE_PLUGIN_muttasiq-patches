@@ -210,61 +210,8 @@ return """
         window.Native.dispatch(eventName, payload);
     });
 
-    function serializeBody(body) {
-        if (body instanceof FormData) {
-            const formObj = {};
-            body.forEach(function(value, key) {
-                formObj[key] = value;
-            });
-            return JSON.stringify(formObj);
-        }
-
-        if (typeof body === "string") {
-            return body;
-        }
-
-        if (body && typeof body === "object") {
-            try {
-                return JSON.stringify(body);
-            } catch (error) {
-                return String(body);
-            }
-        }
-
-        return body == null ? "" : String(body);
-    }
-
-    function headersToString(headers) {
-        let headerString = "";
-
-        if (!headers) {
-            return headerString;
-        }
-
-        if (headers instanceof Headers) {
-            headers.forEach(function(value, key) {
-                headerString += key + ": " + value + "\n";
-            });
-
-            return headerString;
-        }
-
-        if (Array.isArray(headers)) {
-            headers.forEach(function(entry) {
-                if (Array.isArray(entry) && entry.length >= 2) {
-                    headerString += entry[0] + ": " + entry[1] + "\n";
-                }
-            });
-
-            return headerString;
-        }
-
-        Object.keys(headers).forEach(function(key) {
-            headerString += key + ": " + headers[key] + "\n";
-        });
-
-        return headerString;
-    }
+    // Unique request ID counter
+    var _nphpReqId = 0;
 
     document.addEventListener("submit", function(e) {
         const form = e.target;
@@ -279,37 +226,25 @@ return """
             urlEncodedData.append(pair[0], pair[1]);
         }
 
-        AndroidPOST.logPostData(
-            urlEncodedData.toString(),
-            form.action,
-            "Content-Type: application/x-www-form-urlencoded"
-        );
+        const bodyStr = urlEncodedData.toString();
+        AndroidPOST.logFormPostData(bodyStr, form.action);
     });
 
     const originalXHROpen = XMLHttpRequest.prototype.open;
     const originalXHRSend = XMLHttpRequest.prototype.send;
-    const originalXHRSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+    const originalXHRSetHeader = XMLHttpRequest.prototype.setRequestHeader;
 
     XMLHttpRequest.prototype.open = function(method, url) {
         this._method = method;
         this._url = url;
-        this._nativeHeaders = {};
         return originalXHROpen.apply(this, arguments);
-    };
-
-    XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
-        this._nativeHeaders = this._nativeHeaders || {};
-        this._nativeHeaders[name] = value;
-        return originalXHRSetRequestHeader.apply(this, arguments);
     };
 
     XMLHttpRequest.prototype.send = function(data) {
         if (["post", "patch", "put"].includes((this._method || "").toLowerCase()) && data != null) {
-            AndroidPOST.logPostData(
-                serializeBody(data),
-                this._url,
-                headersToString(this._nativeHeaders)
-            );
+            var reqId = "nphp_" + (++_nphpReqId) + "_" + Date.now();
+            AndroidPOST.logPostData(String(data), this._url, "", reqId);
+            originalXHRSetHeader.call(this, "X-NativePHP-Req-Id", reqId);
         }
         return originalXHRSend.apply(this, arguments);
     };
@@ -317,12 +252,30 @@ return """
     const originalFetch = window.fetch;
 
     window.fetch = function(url, options) {
-        if (options && options.method && ["post", "patch", "put"].includes(options.method.toLowerCase()) && options.body != null) {
-            AndroidPOST.logPostData(
-                serializeBody(options.body),
-                url,
-                headersToString(options.headers)
-            );
+        if (options && options.method && ["post", "patch", "put"].includes(options.method.toLowerCase()) && options.body) {
+            var reqId = "nphp_" + (++_nphpReqId) + "_" + Date.now();
+
+            var bodyStr = options.body;
+            if (options.body instanceof FormData) {
+                var urlParams = new URLSearchParams();
+                options.body.forEach(function(value, key) {
+                    urlParams.append(key, value);
+                });
+                bodyStr = urlParams.toString();
+            } else if (typeof options.body === "object" && !(options.body instanceof Blob) && !(options.body instanceof ArrayBuffer)) {
+                bodyStr = JSON.stringify(options.body);
+            }
+
+            AndroidPOST.logPostData(String(bodyStr), url, "", reqId);
+
+            if (!options.headers) {
+                options.headers = {};
+            }
+            if (options.headers instanceof Headers) {
+                options.headers.set("X-NativePHP-Req-Id", reqId);
+            } else {
+                options.headers["X-NativePHP-Req-Id"] = reqId;
+            }
         }
         return originalFetch.apply(this, arguments);
     };
@@ -339,13 +292,14 @@ return """
         }
     }
 
-    function observeForCsrfToken() {
+    findAndSendCsrfToken();
+
+    const attachMutationObserver = function() {
         if (!document.body) {
-            document.addEventListener("DOMContentLoaded", observeForCsrfToken, { once: true });
             return;
         }
 
-        const observer = new MutationObserver(function() {
+        var observer = new MutationObserver(function() {
             findAndSendCsrfToken();
         });
 
@@ -353,10 +307,13 @@ return """
             childList: true,
             subtree: true
         });
-    }
+    };
 
-    findAndSendCsrfToken();
-    observeForCsrfToken();
+    if (document.body) {
+        attachMutationObserver();
+    } else {
+        document.addEventListener("DOMContentLoaded", attachMutationObserver, { once: true });
+    }
 
     return "POST+PATCH+PUT interception installed";
 })();
