@@ -638,6 +638,33 @@ KOTLIN,
         }
 
         @android.webkit.JavascriptInterface
+        fun restartApplication() {
+            Log.d("AndroidBridge", "Restart requested from WebView")
+
+            runOnUiThread {
+                try {
+                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        addFlags(
+                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        )
+                    }
+
+                    if (launchIntent != null) {
+                        startActivity(launchIntent)
+                    } else {
+                        Log.w("AndroidBridge", "Restart launch intent unavailable")
+                    }
+
+                    finishAffinity()
+                    Runtime.getRuntime().exit(0)
+                } catch (exception: Exception) {
+                    Log.e("AndroidBridge", "Restart failed", exception)
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun openDrawer() {
 KOTLIN,
             'AndroidBridge Quran volume setter',
@@ -670,6 +697,33 @@ KOTLIN,
             } catch (exception: Exception) {
                 Log.w("AndroidBridge", "Unable to resolve app firstInstallTime", exception)
                 ""
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun restartApplication() {
+            Log.d("AndroidBridge", "Restart requested from WebView")
+
+            runOnUiThread {
+                try {
+                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        addFlags(
+                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        )
+                    }
+
+                    if (launchIntent != null) {
+                        startActivity(launchIntent)
+                    } else {
+                        Log.w("AndroidBridge", "Restart launch intent unavailable")
+                    }
+
+                    finishAffinity()
+                    Runtime.getRuntime().exit(0)
+                } catch (exception: Exception) {
+                    Log.e("AndroidBridge", "Restart failed", exception)
+                }
             }
         }
 

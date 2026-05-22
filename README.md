@@ -18,6 +18,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Patches `MainActivity.kt` to improve system bars, `safe-area` injection, native back handling, and WebView state behavior.
 - Adds Android Quran startup lifecycle tracing from `MainActivity.kt` (`onResume` / `onPause`) to both `logcat` and in-WebView custom events (`quran-native-lifecycle`) for debugging reader boot visibility/calibration issues.
 - Adds Android bridge method `getAppFirstInstallTime()` so WebView-side state can detect reinstall fingerprints and reset stale Quran reader local storage when Android restores old WebView data.
+- Adds Android bridge method `restartApplication()` so WebView flows can request a full native app restart (finish + process exit + relaunch intent) after first-run Quran data bootstrap.
 - Patches Android `AndroidManifest.xml` + backup rule XMLs to disable cloud/device-transfer backup for app storage domains, preventing restored stale WebView/localStorage reader state after uninstall/reinstall.
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, while preserving NativePHP 3.2 request-id forwarding (`X-NativePHP-Req-Id`) used by Android POST body replay.
 - Patches `PHPBridge.kt` to validate that persistent runtime boot is actually usable before enabling persistent mode, and auto-fallbacks to classic request handling if runtime boot state is lost.
@@ -44,6 +45,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-system-ui`: patches `MainActivity.kt` for system bars, `safe-area`, first-launch reload behavior, and disabled WebView state saving.
 - `native-system-ui`: includes Quran lifecycle startup tracing dispatch (`quran-native-lifecycle`) from Android activity lifecycle hooks for runtime diagnostics.
 - `native-system-ui`: includes Android bridge exposure of `getAppFirstInstallTime()` for native reinstall fingerprinting on the WebView side.
+- `native-system-ui`: includes Android bridge exposure of `restartApplication()` for app-driven full restart flows after native Quran bootstrap completion.
 - `native-back-handler`: upgrades native back button delegation so it can cooperate with the app's navigation logic.
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
