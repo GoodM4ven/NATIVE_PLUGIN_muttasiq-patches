@@ -151,6 +151,55 @@ KOTLIN;
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'injectSafeAreaInsetsToWebView', $injectSafeAreaBody);
         $changed = $changed || $updated;
 
+        $quranNativeLifecycleBlock = <<<'KOTLIN'
+    private fun dispatchQuranNativeLifecycle(eventName: String, detail: String = "") {
+        val safeEventName = eventName
+            .replace("\\", "\\\\")
+            .replace("'", "\\'")
+        val safeDetail = detail
+            .replace("\\", "\\\\")
+            .replace("'", "\\'")
+
+        Log.d(
+            "QuranLifecycle",
+            "event=$eventName detail=$detail hasWebView=${::webView.isInitialized}"
+        )
+
+        if (!::webView.isInitialized) {
+            return
+        }
+
+        val jsCode = """
+            (function() {
+                const payload = {
+                    event: '$safeEventName',
+                    detail: '$safeDetail',
+                    ts: Date.now(),
+                    visibilityState: document.visibilityState ?? null,
+                    hasFocus: (typeof document.hasFocus === 'function') ? document.hasFocus() : null,
+                };
+
+                window.dispatchEvent(new CustomEvent('quran-native-lifecycle', {
+                    detail: payload,
+                }));
+
+                if (window.Native && typeof window.Native.dispatch === 'function') {
+                    window.Native.dispatch('quran-native-lifecycle', payload);
+                }
+            })();
+        """.trimIndent()
+
+        webView.evaluateJavascript(jsCode, null)
+    }
+KOTLIN;
+
+        $changed = $this->insertBeforeOrError(
+            $text,
+            '    private fun initializeEnvironmentAsync(onReady: () -> Unit) {',
+            rtrim($quranNativeLifecycleBlock, "\n"),
+            'Quran native lifecycle bridge',
+        ) || $changed;
+
         $volumeDispatchBlock = <<<'KOTLIN'
     private fun dispatchQuranVolumeButton(direction: String) {
         val escapedDirection = direction
@@ -277,6 +326,26 @@ Thread {
 KOTLIN;
 
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'initializeEnvironmentAsync', $initializeEnvironmentBody);
+        $changed = $changed || $updated;
+
+        $onResumeBody = <<<'KOTLIN'
+super.onResume()
+NativePHPLifecycle.post(NativePHPLifecycle.Events.ON_RESUME)
+
+Log.d("QuranLifecycle", "MainActivity onResume")
+dispatchQuranNativeLifecycle("activity-resume")
+KOTLIN;
+        [$text, $updated] = $this->setKotlinFunctionBody($text, 'onResume', $onResumeBody);
+        $changed = $changed || $updated;
+
+        $onPauseBody = <<<'KOTLIN'
+Log.d("QuranLifecycle", "MainActivity onPause")
+dispatchQuranNativeLifecycle("activity-pause")
+
+super.onPause()
+NativePHPLifecycle.post(NativePHPLifecycle.Events.ON_PAUSE)
+KOTLIN;
+        [$text, $updated] = $this->setKotlinFunctionBody($text, 'onPause', $onPauseBody);
         $changed = $changed || $updated;
 
         $onDestroyBody = <<<'KOTLIN'
@@ -559,10 +628,56 @@ KOTLIN,
         }
 
         @android.webkit.JavascriptInterface
+        fun getAppFirstInstallTime(): String {
+            return try {
+                packageManager.getPackageInfo(packageName, 0).firstInstallTime.toString()
+            } catch (exception: Exception) {
+                Log.w("AndroidBridge", "Unable to resolve app firstInstallTime", exception)
+                ""
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun openDrawer() {
 KOTLIN,
             'AndroidBridge Quran volume setter',
             'fun setQuranVolumeNavigationEnabled(enabled: Boolean)',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            <<<'KOTLIN'
+        @android.webkit.JavascriptInterface
+        fun setQuranVolumeNavigationEnabled(enabled: Boolean) {
+            isQuranVolumeNavigationEnabled = enabled
+            Log.d("AndroidBridge", "Quran volume navigation enabled=$enabled")
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openDrawer() {
+KOTLIN,
+            <<<'KOTLIN'
+        @android.webkit.JavascriptInterface
+        fun setQuranVolumeNavigationEnabled(enabled: Boolean) {
+            isQuranVolumeNavigationEnabled = enabled
+            Log.d("AndroidBridge", "Quran volume navigation enabled=$enabled")
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getAppFirstInstallTime(): String {
+            return try {
+                packageManager.getPackageInfo(packageName, 0).firstInstallTime.toString()
+            } catch (exception: Exception) {
+                Log.w("AndroidBridge", "Unable to resolve app firstInstallTime", exception)
+                ""
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openDrawer() {
+KOTLIN,
+            'AndroidBridge app first install bridge',
+            'fun getAppFirstInstallTime(): String',
         ) || $changed;
 
         if ($changed) {

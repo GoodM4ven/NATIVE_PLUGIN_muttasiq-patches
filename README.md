@@ -16,6 +16,9 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 
 - Applies the required `EDGE` patches in `nativephp/mobile` so empty navigation components are not rendered and nested native component trees are preserved correctly.
 - Patches `MainActivity.kt` to improve system bars, `safe-area` injection, native back handling, and WebView state behavior.
+- Adds Android Quran startup lifecycle tracing from `MainActivity.kt` (`onResume` / `onPause`) to both `logcat` and in-WebView custom events (`quran-native-lifecycle`) for debugging reader boot visibility/calibration issues.
+- Adds Android bridge method `getAppFirstInstallTime()` so WebView-side state can detect reinstall fingerprints and reset stale Quran reader local storage when Android restores old WebView data.
+- Patches Android `AndroidManifest.xml` + backup rule XMLs to disable cloud/device-transfer backup for app storage domains, preventing restored stale WebView/localStorage reader state after uninstall/reinstall.
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, while preserving NativePHP 3.2 request-id forwarding (`X-NativePHP-Req-Id`) used by Android POST body replay.
 - Patches `PHPBridge.kt` to validate that persistent runtime boot is actually usable before enabling persistent mode, and auto-fallbacks to classic request handling if runtime boot state is lost.
 - Patches `PHPWebViewClient.kt` so Muttasiq's Quran page fonts are streamed directly from the bundled raw-data files, and binary asset misses no longer fall back through the unsafe JNI string bridge.
@@ -39,6 +42,8 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 
 - `native-edge`: patches `TopBar`, `BottomNav`, and `Edge` internals.
 - `native-system-ui`: patches `MainActivity.kt` for system bars, `safe-area`, first-launch reload behavior, and disabled WebView state saving.
+- `native-system-ui`: includes Quran lifecycle startup tracing dispatch (`quran-native-lifecycle`) from Android activity lifecycle hooks for runtime diagnostics.
+- `native-system-ui`: includes Android bridge exposure of `getAppFirstInstallTime()` for native reinstall fingerprinting on the WebView side.
 - `native-back-handler`: upgrades native back button delegation so it can cooperate with the app's navigation logic.
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
@@ -47,6 +52,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-android-assets`: also resolves the route-backed Quran header and supported basmallah font endpoints from the bundled raw-data tree to avoid JNI crashes on binary font responses.
 - `native-bundle-extract`: prunes the dormant Quran exegesis payload, generated local Quran snapshot artifacts (`database/native-quran-reader.*`), plus stale `public/build/assets/*` entries not referenced by `public/build/manifest.json` from Android's generated `laravel_bundle.zip`, patches `LaravelEnvironment.kt` unzip behavior to use streaming extraction with ZIP slip protection, keeps a runtime exegesis skip fallback, forces native queue execution to `sync`, applies optional `NATIVE_*_ENDPOINT` runtime overrides (with loopback-to-LAN normalization unless `NATIVE_ANDROID_KEEP_LOOPBACK_ENDPOINTS=1`), and swaps raw `migrate --force` for `app:native-bootstrap --no-interaction`.
 - `native-queue-worker-verbosity`: patches `PHPQueueWorker.kt` so Android queue ticks run with verbose Artisan output and include queue output logs in `logcat`.
+- `native-no-backup`: patches Android manifest backup flags and backup rule XMLs to disable backup/restore for file, database, shared-pref, external, and root app domains.
 - `native-ios-system-ui`: verifies the upstream iOS layout structure still exposes the top and bottom native chrome that Muttasiq expects.
 - `native-ios-back`: patches `ContentView.swift` so the native left-edge gesture delegates to the app's web back action before falling back to WebView history.
 - `native-ios-db-bootstrap`: patches `NativePHPApp.swift` so iOS startup and embedded artisan execution stay on sqlite, and classic/fallback startup paths still run migrations before serving requests.

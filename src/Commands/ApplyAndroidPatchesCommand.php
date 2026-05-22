@@ -6,6 +6,7 @@ namespace Goodm4ven\NativePatches\Commands;
 
 use Goodm4ven\NativePatches\Commands\Concerns\InteractsWithPatchFiles;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidLaravelEnvironment;
+use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidManifest;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidMainActivity;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidPhpBridge;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidPhpQueueWorker;
@@ -20,6 +21,7 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
 {
     use InteractsWithPatchFiles;
     use PatchesAndroidLaravelEnvironment;
+    use PatchesAndroidManifest;
     use PatchesAndroidMainActivity;
     use PatchesAndroidPhpBridge;
     use PatchesAndroidPhpQueueWorker;
@@ -68,6 +70,23 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $mainActivityPath = $buildPath.'/app/src/main/java/com/nativephp/mobile/ui/MainActivity.kt';
         try {
             $this->patchMainActivity($mainActivityPath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
+        $androidManifestPath = $buildPath.'/app/src/main/AndroidManifest.xml';
+        try {
+            $this->patchAndroidManifest($androidManifestPath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
+        $dataExtractionRulesPath = $buildPath.'/app/src/main/res/xml/data_extraction_rules.xml';
+        $backupRulesPath = $buildPath.'/app/src/main/res/xml/backup_rules.xml';
+        try {
+            $this->patchAndroidBackupRules($dataExtractionRulesPath, $backupRulesPath);
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
             $hadErrors = true;
