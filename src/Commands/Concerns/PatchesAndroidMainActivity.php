@@ -53,16 +53,16 @@ trait PatchesAndroidMainActivity
             throw new RuntimeException('[native-system-ui] error: pattern not found for lifecycle destroyed flag');
         }
 
-        $volumeFieldPattern = '/(    private var showSplash by mutableStateOf\(true\)\n)(?!    @Volatile\n    private var isQuranVolumeNavigationEnabled = false\n)/m';
+        $volumeFieldPattern = '/(    private var showSplash by mutableStateOf\(true\)\n)(?!    private val splashShownAtMs = System\.currentTimeMillis\(\)\n    @Volatile\n    private var isQuranVolumeNavigationEnabled = false\n)/m';
         if (preg_match($volumeFieldPattern, $text) === 1) {
             $text = preg_replace(
                 $volumeFieldPattern,
-                "    private var showSplash by mutableStateOf(true)\n    @Volatile\n    private var isQuranVolumeNavigationEnabled = false\n",
+                "    private var showSplash by mutableStateOf(true)\n    private val splashShownAtMs = System.currentTimeMillis()\n    @Volatile\n    private var isQuranVolumeNavigationEnabled = false\n",
                 $text,
                 1,
             );
             $changed = true;
-        } elseif (! str_contains($text, "    private var isQuranVolumeNavigationEnabled = false\n")) {
+        } elseif (! str_contains($text, "    private val splashShownAtMs = System.currentTimeMillis()\n")) {
             throw new RuntimeException('[native-system-ui] error: pattern not found for Quran volume navigation flag');
         }
 
@@ -328,6 +328,14 @@ KOTLIN;
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'initializeEnvironmentAsync', $initializeEnvironmentBody);
         $changed = $changed || $updated;
 
+        $changed = $this->replaceOnceOrError(
+            $text,
+            "            // Hide splash screen after URL is loaded\n            showSplash = false\n",
+            "            // Keep splash visible for a short minimum duration to avoid instant flash on warm starts.\n            val elapsedSinceSplashShownMs = System.currentTimeMillis() - splashShownAtMs\n            val minimumSplashDurationMs = 1600L\n            val remainingSplashDurationMs = (minimumSplashDurationMs - elapsedSinceSplashShownMs)\n                .coerceAtLeast(0L)\n\n            Handler(Looper.getMainLooper()).postDelayed({\n                showSplash = false\n            }, remainingSplashDurationMs)\n",
+            'splash minimum duration',
+            'val minimumSplashDurationMs = 1600L',
+        ) || $changed;
+
         $onResumeBody = <<<'KOTLIN'
 super.onResume()
 NativePHPLifecycle.post(NativePHPLifecycle.Events.ON_RESUME)
@@ -471,6 +479,14 @@ KOTLIN;
             ) || $changed;
         }
 
+        $changed = $this->replaceOnceOrError(
+            $text,
+            '.background(Color.Black),',
+            '.background(if (isSystemInDarkTheme()) Color.Black else Color.White),',
+            'Splash background harmonization',
+            '.background(if (isSystemInDarkTheme()) Color.Black else Color.White),',
+        ) || $changed;
+
         $this->writePatchResult($path, $text, $changed, 'native-system-ui');
 
         $text = file_get_contents($path);
@@ -499,12 +515,16 @@ KOTLIN;
                     "const modals = Array.from(document.querySelectorAll('.fi-modal.fi-modal-open')); " +
                     "if (modals.length > 0) { " +
                         "const topModal = modals[modals.length - 1]; " +
-                        "const modalId = String((topModal && topModal.getAttribute('data-fi-modal-id')) || ((topModal && topModal.querySelector) ? (topModal.querySelector('.fi-modal-window') && topModal.querySelector('.fi-modal-window').id) : '') || '').trim(); " +
+                        "const modalWindow = (topModal && topModal.querySelector) ? topModal.querySelector('.fi-modal-window') : null; " +
+                        "const modalId = String((topModal && topModal.getAttribute('data-fi-modal-id')) || (modalWindow && modalWindow.id) || (topModal && topModal.id) || '').trim(); " +
+                        "const closeButton = (topModal && topModal.querySelector) ? topModal.querySelector('[data-fi-modal-close], .fi-modal-close-btn') : null; " +
                         "if (modalId) { " +
                             "window.dispatchEvent(new CustomEvent('close-modal-quietly', { detail: { id: modalId } })); " +
                             "window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: modalId } })); " +
+                            "if (closeButton && typeof closeButton.click === 'function') { closeButton.click(); } " +
                         "} else { " +
                             "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true })); " +
+                            "if (closeButton && typeof closeButton.click === 'function') { closeButton.click(); } " +
                         "} " +
                         "return true; " +
                     "} " +

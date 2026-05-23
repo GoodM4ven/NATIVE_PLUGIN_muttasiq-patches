@@ -42,6 +42,13 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
     ];
 
     private const BUNDLED_BUILD_ASSET_PREFIX = 'public/build/assets/';
+    /**
+     * @var list<string>
+     */
+    private const BUNDLED_BUILD_ASSET_PRUNED_SUFFIXES = [
+        '.map',
+        '.LICENSE.txt',
+    ];
 
     public function handle(): int
     {
@@ -170,6 +177,7 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $removedEntriesCount = 0;
         $removedEntriesSize = 0;
         $removedDormantQuranEntriesCount = 0;
+        $removedBuildDebugEntriesCount = 0;
         $removedStaleBuildEntriesCount = 0;
 
         try {
@@ -193,6 +201,10 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
 
                     if ($pruneReason === 'stale-build-asset') {
                         $removedStaleBuildEntriesCount++;
+                    }
+
+                    if ($pruneReason === 'build-debug-asset') {
+                        $removedBuildDebugEntriesCount++;
                     }
 
                     continue;
@@ -236,7 +248,7 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $removedEntriesSizeInMegabytes = number_format($removedEntriesSize / 1024 / 1024, 2);
         $this->info(
             "Pruned {$removedEntriesCount} Laravel bundle entries ({$removedEntriesSizeInMegabytes} MB) from [{$archivePath}]"
-            ." [dormant-quran-exegesis={$removedDormantQuranEntriesCount}, stale-build-assets={$removedStaleBuildEntriesCount}].",
+            ." [dormant-quran-exegesis={$removedDormantQuranEntriesCount}, build-debug-assets={$removedBuildDebugEntriesCount}, stale-build-assets={$removedStaleBuildEntriesCount}].",
         );
     }
 
@@ -252,6 +264,13 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         }
 
         if (
+            str_starts_with($entryName, self::BUNDLED_BUILD_ASSET_PREFIX)
+            && $this->isPrunedBuildDebugAssetEntry($entryName)
+        ) {
+            return 'build-debug-asset';
+        }
+
+        if (
             $retainedBuildAssetEntries !== null
             && str_starts_with($entryName, self::BUNDLED_BUILD_ASSET_PREFIX)
             && ! isset($retainedBuildAssetEntries[$entryName])
@@ -260,6 +279,17 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         }
 
         return null;
+    }
+
+    private function isPrunedBuildDebugAssetEntry(string $entryName): bool
+    {
+        foreach (self::BUNDLED_BUILD_ASSET_PRUNED_SUFFIXES as $suffix) {
+            if (str_ends_with($entryName, $suffix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
