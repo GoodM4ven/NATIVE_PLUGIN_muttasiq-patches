@@ -110,8 +110,15 @@ KOTLIN,
 
         $changed = $this->insertImport(
             $text,
+            'import android.content.pm.ApplicationInfo',
+            'import android.content.pm.ActivityInfo',
+            'ApplicationInfo import',
+        ) || $changed;
+
+        $changed = $this->insertImport(
+            $text,
             'import androidx.webkit.WebViewCompat',
-            'import android.app.Activity',
+            'import android.content.pm.ApplicationInfo',
             'WebViewCompat import',
         ) || $changed;
 
@@ -124,18 +131,82 @@ KOTLIN,
 
         $fieldPattern = '/(    private var customViewCallback: WebChromeClient\.CustomViewCallback\? = null
 )(?!    private var requestInterceptionInstalled = false
+    private val isDebugBuild = \(context\.applicationInfo\.flags and ApplicationInfo\.FLAG_DEBUGGABLE\) != 0
 )/m';
         if (preg_match($fieldPattern, $text) === 1) {
             $text = preg_replace(
                 $fieldPattern,
-                "    private var customViewCallback: WebChromeClient.CustomViewCallback? = null\n    private var requestInterceptionInstalled = false\n",
+                "    private var customViewCallback: WebChromeClient.CustomViewCallback? = null\n    private var requestInterceptionInstalled = false\n    private val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0\n",
                 $text,
                 1,
             );
             $changed = true;
-        } elseif (! str_contains($text, "    private var requestInterceptionInstalled = false\n")) {
+        } elseif (! str_contains($text, "    private val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0\n")) {
             throw new RuntimeException('[native-request-capture] error: pattern not found for request interception field');
         }
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            "        WebView.setWebContentsDebuggingEnabled(true)\n",
+            "        WebView.setWebContentsDebuggingEnabled(isDebugBuild)\n",
+            'WebView debugging mode',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            "            private val requestInspector = RequestInspectorWebViewClient(webView)\n",
+            "            private val requestInspector = if (isDebugBuild) RequestInspectorWebViewClient(webView) else null\n",
+            'request inspector debug guard',
+            'if (isDebugBuild) RequestInspectorWebViewClient(webView) else null',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            "                val inspectorResponse = requestInspector.shouldInterceptRequest(view, request)\n",
+            "                val inspectorResponse = requestInspector?.shouldInterceptRequest(view, request)\n",
+            'request inspector nullable interception',
+            'requestInspector?.shouldInterceptRequest',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            <<<'KOTLIN'
+                Log.d("$TAG-DEBUG", "URL: $url, Method: $method")
+                Log.d(TAG, "⬆️ shouldOverrideUrlLoading: $url")
+KOTLIN,
+            <<<'KOTLIN'
+                if (isDebugBuild) {
+                    Log.d("$TAG-DEBUG", "URL: $url, Method: $method")
+                    Log.d(TAG, "⬆️ shouldOverrideUrlLoading: $url")
+                }
+KOTLIN,
+            'shouldOverrideUrlLoading debug logging guard',
+            'if (isDebugBuild) {',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            <<<'KOTLIN'
+                Log.d(TAG, "🔄 Intercepting $method request to $url")
+
+                request.requestHeaders.forEach { (key, value) ->
+                    Log.d("$TAG-Headers", "📋 $key: $value")
+                }
+
+KOTLIN,
+            <<<'KOTLIN'
+                if (isDebugBuild) {
+                    Log.d(TAG, "🔄 Intercepting $method request to $url")
+
+                    request.requestHeaders.forEach { (key, value) ->
+                        Log.d("$TAG-Headers", "📋 $key: $value")
+                    }
+                }
+
+KOTLIN,
+            'shouldInterceptRequest debug logging guard',
+            'request.requestHeaders.forEach',
+        ) || $changed;
 
         $changed = $this->replaceOnceOrError(
             $text,

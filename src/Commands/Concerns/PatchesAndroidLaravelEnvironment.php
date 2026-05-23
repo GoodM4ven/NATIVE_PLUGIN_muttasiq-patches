@@ -30,6 +30,10 @@ trait PatchesAndroidLaravelEnvironment
         );
 
 $unzipBody = <<<'KOTLIN'
+val unzipStartedAtMs = System.currentTimeMillis()
+var extractedEntries = 0
+var skippedEntries = 0
+var extractedBytes = 0L
 val buffer = ByteArray(65536)
 ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
     var ze: ZipEntry? = zis.nextEntry
@@ -37,7 +41,7 @@ ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
     while (ze != null) {
         // Skip storage directory - we use persisted_data/storage instead
         if (ze.name.startsWith("storage/") || ze.name == "storage") {
-            Log.d(TAG, "⏭️ Skipping storage directory from bundle: ${ze.name}")
+            skippedEntries += 1
             zis.closeEntry()
             ze = zis.nextEntry
             continue
@@ -49,7 +53,7 @@ ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
                 || ze.name.startsWith("vendor/goodm4ven/arabicable/resources/raw-data/quran/exegesis/")
 
         if (skipsDormantQuranExegesis) {
-            Log.d(TAG, "⏭️ Skipping dormant Quran exegesis bundle entry: ${ze.name}")
+            skippedEntries += 1
             zis.closeEntry()
             ze = zis.nextEntry
             continue
@@ -67,11 +71,13 @@ ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
         if (ze.isDirectory) {
             file.mkdirs()
         } else {
+            extractedEntries += 1
             file.parentFile?.mkdirs()
             FileOutputStream(file).use { fos ->
                 var count: Int
                 while (zis.read(buffer).also { count = it } != -1) {
                     fos.write(buffer, 0, count)
+                    extractedBytes += count.toLong()
                 }
                 fos.flush()
             }
@@ -81,12 +87,20 @@ ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
         ze = zis.nextEntry
     }
 }
+val extractedMegabytes = extractedBytes.toDouble() / 1024.0 / 1024.0
+Log.i(
+    TAG,
+    "⏱️ native-unzip summary: extractedEntries=$extractedEntries skippedEntries=$skippedEntries extractedMB="
+        + String.format("%.2f", extractedMegabytes)
+        + " durationMs=${System.currentTimeMillis() - unzipStartedAtMs}"
+)
 KOTLIN;
 
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'unzip', $unzipBody);
         $changed = $changed || $updated;
 
 $runBaseArtisanCommandsBody = <<<'KOTLIN'
+val bootstrapStartedAtMs = System.currentTimeMillis()
 val dbFile = File(appStorageDir, "persisted_data/database/database.sqlite")
 dbFile.parentFile?.mkdirs()
 
@@ -99,10 +113,14 @@ if (!dbFile.exists() || dbFile.length() == 0L) {
 
 val storagePublicDir = File(appStorageDir, "persisted_data/storage/app/public")
 if (!storagePublicDir.exists()) {
-    phpBridge.runArtisanCommand("storage:unlink")
+    val storageLinkStartMs = System.currentTimeMillis()
     phpBridge.runArtisanCommand("storage:link")
+    Log.i(TAG, "⏱️ native-bootstrap storage:link durationMs=${System.currentTimeMillis() - storageLinkStartMs}")
 }
+val appBootstrapStartMs = System.currentTimeMillis()
 phpBridge.runArtisanCommand("app:native-bootstrap --no-interaction")
+Log.i(TAG, "⏱️ native-bootstrap app:native-bootstrap durationMs=${System.currentTimeMillis() - appBootstrapStartMs}")
+Log.i(TAG, "⏱️ native-bootstrap total durationMs=${System.currentTimeMillis() - bootstrapStartedAtMs}")
 KOTLIN;
 
         [$text, $updated] = $this->setKotlinFunctionBody(

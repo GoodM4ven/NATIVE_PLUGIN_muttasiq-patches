@@ -248,8 +248,10 @@ KOTLIN;
             'Quran volume key bridge',
         ) || $changed;
 
-        $initializeEnvironmentBody = <<<'KOTLIN'
+$initializeEnvironmentBody = <<<'KOTLIN'
 Thread {
+    val initStartedAtMs = System.currentTimeMillis()
+    var initSpinWaitIterations = 0
     Log.d("LaravelInit", "📦 Starting async Laravel extraction...")
     if (isMainActivityDestroyed) {
         Log.w("LaravelInit", "Skipping environment init because activity is already destroyed")
@@ -271,6 +273,7 @@ Thread {
         }
 
         if (!acquiredInitSlot) {
+            initSpinWaitIterations += 1
             try {
                 Thread.sleep(50)
             } catch (e: InterruptedException) {
@@ -281,8 +284,13 @@ Thread {
     }
 
     try {
+        val laravelEnvironmentInitStartMs = System.currentTimeMillis()
         laravelEnv = LaravelEnvironment(this)
         laravelEnv.initialize()
+        Log.i(
+            "LaravelInit",
+            "⏱️ phase=laravel-environment-initialize durationMs=${System.currentTimeMillis() - laravelEnvironmentInitStartMs} totalMs=${System.currentTimeMillis() - initStartedAtMs} spinWaitIterations=$initSpinWaitIterations"
+        )
 
         if (isMainActivityDestroyed) {
             Log.w("LaravelInit", "Skipping onReady callback because activity was destroyed during init")
@@ -309,12 +317,21 @@ Thread {
             }
         }
 
+        Log.i(
+            "LaravelInit",
+            "⏱️ phase=environment-ready totalMs=${System.currentTimeMillis() - initStartedAtMs}"
+        )
+
         Handler(Looper.getMainLooper()).post {
             if (isMainActivityDestroyed || isFinishing || isDestroyed || supportFragmentManager.isDestroyed) {
                 Log.w("LaravelInit", "Skipping onReady callback because activity is no longer valid")
                 return@post
             }
 
+            Log.i(
+                "LaravelInit",
+                "⏱️ phase=onReady-dispatch totalMs=${System.currentTimeMillis() - initStartedAtMs}"
+            )
             onReady()
         }
     } finally {
@@ -331,7 +348,7 @@ KOTLIN;
         $changed = $this->replaceOnceOrError(
             $text,
             "            // Hide splash screen after URL is loaded\n            showSplash = false\n",
-            "            // Keep splash visible for a short minimum duration to avoid instant flash on warm starts.\n            val elapsedSinceSplashShownMs = System.currentTimeMillis() - splashShownAtMs\n            val minimumSplashDurationMs = 1600L\n            val remainingSplashDurationMs = (minimumSplashDurationMs - elapsedSinceSplashShownMs)\n                .coerceAtLeast(0L)\n\n            Handler(Looper.getMainLooper()).postDelayed({\n                showSplash = false\n            }, remainingSplashDurationMs)\n",
+            "            // Keep splash visible for a short minimum duration to avoid instant flash on warm starts.\n            val elapsedSinceSplashShownMs = System.currentTimeMillis() - splashShownAtMs\n            val minimumSplashDurationMs = 1600L\n            val remainingSplashDurationMs = (minimumSplashDurationMs - elapsedSinceSplashShownMs)\n                .coerceAtLeast(0L)\n\n            Handler(Looper.getMainLooper()).postDelayed({\n                showSplash = false\n                Log.i(\"LaravelInit\", \"⏱️ phase=splash-dismissed totalMs=\${System.currentTimeMillis() - splashShownAtMs} remainingDelayMs=\$remainingSplashDurationMs\")\n            }, remainingSplashDurationMs)\n",
             'splash minimum duration',
             'val minimumSplashDurationMs = 1600L',
         ) || $changed;
