@@ -50,6 +50,63 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         '.LICENSE.txt',
     ];
 
+    /**
+     * @var list<string>
+     */
+    private const BUNDLED_ROOT_PRUNED_PREFIXES = [
+        '.github/',
+        '.scripts/',
+        'tests/',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const BUNDLED_ROOT_PRUNED_FILES = [
+        'phpstan.neon',
+        'phpstan.neon.dist',
+        'phpunit.xml',
+        'phpunit.xml.dist',
+        'pest.php',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const BUNDLED_VENDOR_PRUNED_PATH_SEGMENTS = [
+        '/.github/',
+        '/docs/',
+        '/doc/',
+        '/tests/',
+        '/test/',
+        '/fixtures/',
+        '/Fixtures/',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const BUNDLED_VENDOR_PRUNED_FILE_NAMES = [
+        'readme',
+        'readme.md',
+        'readme.txt',
+        'changelog',
+        'changelog.md',
+        'upgrade.md',
+        'upgrading.md',
+        'contributing.md',
+        'phpunit.xml',
+        'phpunit.xml.dist',
+        'phpstan.neon',
+        'phpstan.neon.dist',
+        'pest.php',
+        'license',
+        'license.md',
+        'license.txt',
+    ];
+
+    private ?array $cachedBundledDevPackagePrefixes = null;
+
     public function handle(): int
     {
         if (! $this->isAndroid()) {
@@ -179,6 +236,9 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $removedDormantQuranEntriesCount = 0;
         $removedBuildDebugEntriesCount = 0;
         $removedStaleBuildEntriesCount = 0;
+        $removedDevOnlyPackageEntriesCount = 0;
+        $removedArabicableSourceEntriesCount = 0;
+        $removedNonRuntimeEntriesCount = 0;
 
         try {
             for ($index = 0; $index < $originalArchive->numFiles; $index++) {
@@ -205,6 +265,18 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
 
                     if ($pruneReason === 'build-debug-asset') {
                         $removedBuildDebugEntriesCount++;
+                    }
+
+                    if ($pruneReason === 'dev-only-package') {
+                        $removedDevOnlyPackageEntriesCount++;
+                    }
+
+                    if ($pruneReason === 'arabicable-source-raw-data') {
+                        $removedArabicableSourceEntriesCount++;
+                    }
+
+                    if ($pruneReason === 'non-runtime-bundle-file') {
+                        $removedNonRuntimeEntriesCount++;
                     }
 
                     continue;
@@ -248,7 +320,7 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $removedEntriesSizeInMegabytes = number_format($removedEntriesSize / 1024 / 1024, 2);
         $this->info(
             "Pruned {$removedEntriesCount} Laravel bundle entries ({$removedEntriesSizeInMegabytes} MB) from [{$archivePath}]"
-            ." [dormant-quran-exegesis={$removedDormantQuranEntriesCount}, build-debug-assets={$removedBuildDebugEntriesCount}, stale-build-assets={$removedStaleBuildEntriesCount}].",
+            ." [dormant-quran-exegesis={$removedDormantQuranEntriesCount}, build-debug-assets={$removedBuildDebugEntriesCount}, stale-build-assets={$removedStaleBuildEntriesCount}, dev-only-packages={$removedDevOnlyPackageEntriesCount}, arabicable-source-raw-data={$removedArabicableSourceEntriesCount}, non-runtime-bundle-files={$removedNonRuntimeEntriesCount}].",
         );
     }
 
@@ -257,28 +329,164 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
      */
     private function bundledLaravelArchivePruneReason(string $entryName, ?array $retainedBuildAssetEntries): ?string
     {
+        $normalizedEntryName = $this->normalizeBundledEntryPath($entryName);
+
         foreach (self::BUNDLED_LARAVEL_ARCHIVE_PRUNE_PREFIXES as $prefix) {
-            if (str_starts_with($entryName, $prefix)) {
+            if (str_starts_with($normalizedEntryName, $prefix)) {
                 return 'dormant-quran-exegesis';
             }
         }
 
         if (
-            str_starts_with($entryName, self::BUNDLED_BUILD_ASSET_PREFIX)
-            && $this->isPrunedBuildDebugAssetEntry($entryName)
+            str_starts_with($normalizedEntryName, self::BUNDLED_BUILD_ASSET_PREFIX)
+            && $this->isPrunedBuildDebugAssetEntry($normalizedEntryName)
         ) {
             return 'build-debug-asset';
         }
 
         if (
             $retainedBuildAssetEntries !== null
-            && str_starts_with($entryName, self::BUNDLED_BUILD_ASSET_PREFIX)
-            && ! isset($retainedBuildAssetEntries[$entryName])
+            && str_starts_with($normalizedEntryName, self::BUNDLED_BUILD_ASSET_PREFIX)
+            && ! isset($retainedBuildAssetEntries[$normalizedEntryName])
         ) {
             return 'stale-build-asset';
         }
 
+        if ($this->isDevOnlyPackageArchiveEntry($normalizedEntryName)) {
+            return 'dev-only-package';
+        }
+
+        if ($this->isArabicableSourceRawDataArchiveEntry($normalizedEntryName)) {
+            return 'arabicable-source-raw-data';
+        }
+
+        if ($this->isNonRuntimeBundleArchiveEntry($normalizedEntryName)) {
+            return 'non-runtime-bundle-file';
+        }
+
         return null;
+    }
+
+    private function isDevOnlyPackageArchiveEntry(string $entryName): bool
+    {
+        foreach ($this->bundledDevPackageArchivePrefixes() as $prefix) {
+            if (str_starts_with($entryName, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isArabicableSourceRawDataArchiveEntry(string $entryName): bool
+    {
+        $arabicableRawDataPrefix = 'vendor/goodm4ven/arabicable/resources/raw-data/';
+
+        if (! str_starts_with($entryName, $arabicableRawDataPrefix) || str_ends_with($entryName, '/')) {
+            return false;
+        }
+
+        $fileName = basename($entryName);
+
+        return str_starts_with($fileName, 'source-');
+    }
+
+    private function isNonRuntimeBundleArchiveEntry(string $entryName): bool
+    {
+        foreach (self::BUNDLED_ROOT_PRUNED_PREFIXES as $prefix) {
+            if (str_starts_with($entryName, $prefix)) {
+                return true;
+            }
+        }
+
+        if (in_array($entryName, self::BUNDLED_ROOT_PRUNED_FILES, true)) {
+            return true;
+        }
+
+        if (! str_starts_with($entryName, 'vendor/')) {
+            return false;
+        }
+
+        $lowerEntryName = strtolower($entryName);
+
+        if (str_ends_with($lowerEntryName, '.map')) {
+            return true;
+        }
+
+        foreach (self::BUNDLED_VENDOR_PRUNED_PATH_SEGMENTS as $segment) {
+            if (str_contains($entryName, $segment)) {
+                return true;
+            }
+        }
+
+        return in_array(strtolower(basename($entryName)), self::BUNDLED_VENDOR_PRUNED_FILE_NAMES, true);
+    }
+
+    private function normalizeBundledEntryPath(string $entryName): string
+    {
+        $normalized = ltrim(str_replace('\\', '/', $entryName), './');
+
+        if (str_starts_with($normalized, 'app_storage/laravel/')) {
+            $normalized = substr($normalized, strlen('app_storage/laravel/'));
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function bundledDevPackageArchivePrefixes(): array
+    {
+        if ($this->cachedBundledDevPackagePrefixes !== null) {
+            return $this->cachedBundledDevPackagePrefixes;
+        }
+
+        $composerLockPath = base_path('composer.lock');
+        if (! is_file($composerLockPath)) {
+            return $this->cachedBundledDevPackagePrefixes = [];
+        }
+
+        try {
+            /** @var mixed $decodedLock */
+            $decodedLock = json_decode(file_get_contents($composerLockPath), true, flags: JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return $this->cachedBundledDevPackagePrefixes = [];
+        }
+
+        if (! is_array($decodedLock)) {
+            return $this->cachedBundledDevPackagePrefixes = [];
+        }
+
+        $packagesDev = $decodedLock['packages-dev'] ?? null;
+        if (! is_array($packagesDev)) {
+            return $this->cachedBundledDevPackagePrefixes = [];
+        }
+
+        $prefixes = [];
+
+        foreach ($packagesDev as $package) {
+            if (! is_array($package)) {
+                continue;
+            }
+
+            $packageName = $package['name'] ?? null;
+            if (! is_string($packageName)) {
+                continue;
+            }
+
+            [$vendorName, $packageSegment] = array_pad(explode('/', $packageName, 2), 2, null);
+
+            if (! is_string($vendorName) || ! is_string($packageSegment)) {
+                continue;
+            }
+
+            $prefixes[] = "vendor/{$vendorName}/{$packageSegment}/";
+        }
+
+        $this->cachedBundledDevPackagePrefixes = array_values(array_unique($prefixes));
+
+        return $this->cachedBundledDevPackagePrefixes;
     }
 
     private function isPrunedBuildDebugAssetEntry(string $entryName): bool
@@ -386,9 +594,12 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
     private function copyArchiveEntryMetadata(ZipArchive $sourceArchive, ZipArchive $targetArchive, int $sourceIndex, string $entryName): void
     {
         $sourceStat = $sourceArchive->statIndex($sourceIndex);
+        $normalizedEntryName = $this->normalizeBundledEntryPath($entryName);
         $compressionMethod = $sourceStat['comp_method'] ?? false;
 
-        if (is_int($compressionMethod)) {
+        if ($this->shouldStoreEntryUncompressed($normalizedEntryName)) {
+            $targetArchive->setCompressionName($entryName, ZipArchive::CM_STORE);
+        } elseif (is_int($compressionMethod)) {
             $targetArchive->setCompressionName($entryName, $compressionMethod);
         }
 
@@ -408,6 +619,40 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
                 ZipArchive::FL_UNCHANGED,
             );
         }
+    }
+
+    private function shouldStoreEntryUncompressed(string $entryName): bool
+    {
+        if (str_ends_with($entryName, '/')) {
+            return false;
+        }
+
+        $extension = strtolower(pathinfo($entryName, PATHINFO_EXTENSION));
+
+        return in_array($extension, [
+            'woff2',
+            'woff',
+            'ttf',
+            'otf',
+            'png',
+            'jpg',
+            'jpeg',
+            'webp',
+            'gif',
+            'ico',
+            'avif',
+            'mp3',
+            'mp4',
+            'm4a',
+            'mov',
+            'zip',
+            'gz',
+            'sqlite',
+            'db',
+            'phar',
+            'wasm',
+            'pdf',
+        ], true);
     }
 
     /**

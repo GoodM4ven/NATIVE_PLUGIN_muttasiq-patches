@@ -34,7 +34,8 @@ val unzipStartedAtMs = System.currentTimeMillis()
 var extractedEntries = 0
 var skippedEntries = 0
 var extractedBytes = 0L
-val buffer = ByteArray(65536)
+val destinationRootPath = destinationDir.toPath().toAbsolutePath().normalize()
+val buffer = ByteArray(262144)
 ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
     var ze: ZipEntry? = zis.nextEntry
 
@@ -59,14 +60,14 @@ ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
             continue
         }
 
-        val file = File(destinationDir, ze.name)
-        val destinationRoot = destinationDir.canonicalPath + File.separator
-        val destinationFile = file.canonicalPath
+        val entryPath = destinationRootPath.resolve(ze.name).normalize()
 
         // Prevent zip-slip path traversal
-        if (!destinationFile.startsWith(destinationRoot)) {
+        if (!entryPath.startsWith(destinationRootPath)) {
             throw SecurityException("Blocked ZIP entry outside extraction dir: ${ze.name}")
         }
+
+        val file = entryPath.toFile()
 
         if (ze.isDirectory) {
             file.mkdirs()
