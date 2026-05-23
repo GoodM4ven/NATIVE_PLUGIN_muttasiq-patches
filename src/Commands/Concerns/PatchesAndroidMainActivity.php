@@ -495,7 +495,21 @@ KOTLIN;
             $newBlock = <<<'KOTLIN'
         onBackPressedDispatcher.addCallback(this) {
             val js =
-                "(function() { try { return window.__nativeBackAction && window.__nativeBackAction(); } " +
+                "(function() { try { " +
+                    "const modals = Array.from(document.querySelectorAll('.fi-modal.fi-modal-open')); " +
+                    "if (modals.length > 0) { " +
+                        "const topModal = modals[modals.length - 1]; " +
+                        "const modalId = String((topModal && topModal.getAttribute('data-fi-modal-id')) || ((topModal && topModal.querySelector) ? (topModal.querySelector('.fi-modal-window') && topModal.querySelector('.fi-modal-window').id) : '') || '').trim(); " +
+                        "if (modalId) { " +
+                            "window.dispatchEvent(new CustomEvent('close-modal-quietly', { detail: { id: modalId } })); " +
+                            "window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: modalId } })); " +
+                        "} else { " +
+                            "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true })); " +
+                        "} " +
+                        "return true; " +
+                    "} " +
+                    "return !!(window.__nativeBackAction && window.__nativeBackAction()); " +
+                "} " +
                     "catch (e) { return false; } })();"
 
             webView.evaluateJavascript(js) { value ->

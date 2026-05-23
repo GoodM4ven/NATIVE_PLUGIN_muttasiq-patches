@@ -46,7 +46,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-system-ui`: includes Quran lifecycle startup tracing dispatch (`quran-native-lifecycle`) from Android activity lifecycle hooks for runtime diagnostics.
 - `native-system-ui`: includes Android bridge exposure of `getAppFirstInstallTime()` for native reinstall fingerprinting on the WebView side.
 - `native-system-ui`: includes Android bridge exposure of `restartApplication()` for app-driven full restart flows after native Quran bootstrap completion.
-- `native-back-handler`: upgrades native back button delegation so it can cooperate with the app's navigation logic.
+- `native-back-handler`: upgrades native back button delegation so it first closes any open Filament modal in the WebView, then falls back to app navigation logic.
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
 - `native-persistent-runtime-guard`: verifies persistent runtime readiness after boot, and degrades to classic handling if Android ever returns `Runtime not booted` during persistent dispatch.
