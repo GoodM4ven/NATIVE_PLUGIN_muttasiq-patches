@@ -52,6 +52,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-system-ui`: includes Android bridge exposure of `restartApplication()` for app-driven full restart flows after native Quran bootstrap completion.
 - `native-back-handler`: upgrades native back button delegation so it first closes any open Filament modal in the WebView, then falls back to app navigation logic.
 - `native-back-handler`: includes close-button fallback dispatch for Filament modals to ensure hardware back consumes open modals before view navigation.
+- `native-back-handler`: includes explicit root-hash (`#main-menu` / `#`) exit fallback so Android system back quits the app when web navigation is already at the main menu.
 - `native-google-reviews`: applies the app-specific Google review handling adjustments inside the activity.
 - `native-request-capture`: installs reliable early interception for `Livewire` and `Filament` requests.
 - `native-request-capture`: debug-gates request inspector work and verbose per-request logging for lower release runtime overhead.

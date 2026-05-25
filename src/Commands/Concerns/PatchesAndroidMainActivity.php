@@ -545,7 +545,12 @@ KOTLIN;
                         "} " +
                         "return true; " +
                     "} " +
-                    "return !!(window.__nativeBackAction && window.__nativeBackAction()); " +
+                    "const nativeBackResult = (typeof window.__nativeBackAction === 'function') ? window.__nativeBackAction() : false; " +
+                    "if (nativeBackResult === 'exit') { return 'exit'; } " +
+                    "if (nativeBackResult === true) { return true; } " +
+                    "const normalizedHash = String(window.location && window.location.hash ? window.location.hash : '#').trim().toLowerCase(); " +
+                    "if (normalizedHash === '#main-menu' || normalizedHash === '#' || normalizedHash === '') { return 'exit'; } " +
+                    "return false; " +
                 "} " +
                     "catch (e) { return false; } })();"
 
