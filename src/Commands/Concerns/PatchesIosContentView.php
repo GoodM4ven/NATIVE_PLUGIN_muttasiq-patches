@@ -78,6 +78,63 @@ trait PatchesIosContentView
             'UIGestureRecognizerDelegate',
         ) || $changed;
 
+        $changed = $this->replaceOnceOrError(
+            $text,
+            "        contentController.addUserScript(script)\n",
+            "        contentController.addUserScript(script)\n        contentController.add(ScreenAwakeBridgeHandler(), name: \"screenAwake\")\n",
+            'iOS screen awake message handler registration',
+            'contentController.add(ScreenAwakeBridgeHandler(), name: "screenAwake")',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            "        window.Native = Native;\n",
+            <<<'SWIFT'
+        window.Native = Native;
+
+        if (typeof window.AndroidBridge !== 'object' || window.AndroidBridge === null) {
+            window.AndroidBridge = {};
+        }
+
+        window.AndroidBridge.setScreenAwake = function(enabled) {
+            try {
+                window.webkit.messageHandlers.screenAwake.postMessage({ enabled: Boolean(enabled) });
+            } catch (_) {
+                // No-op: bridge unavailable.
+            }
+        };
+
+        window.AndroidBridge.setKeepScreenAwake = window.AndroidBridge.setScreenAwake;
+SWIFT,
+            'iOS injected screen awake bridge shim',
+            'window.AndroidBridge.setScreenAwake = function(enabled)',
+        ) || $changed;
+
+        $screenAwakeBridgeHandlerClass = <<<'SWIFT'
+class ScreenAwakeBridgeHandler: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "screenAwake" else {
+            return
+        }
+
+        let payload = message.body as? [String: Any]
+        let enabled = payload?["enabled"] as? Bool ?? false
+
+        DispatchQueue.main.async {
+            UIApplication.shared.isIdleTimerDisabled = enabled
+        }
+    }
+}
+
+SWIFT;
+
+        $changed = $this->insertBeforeOrError(
+            $text,
+            'class ConsoleLogger: NSObject, WKScriptMessageHandler {',
+            $screenAwakeBridgeHandlerClass,
+            'iOS screen awake bridge handler class',
+        ) || $changed;
+
         $backHandlerMethods = <<<'SWIFT'
         @objc func handleBackEdgeGesture(_ gesture: UIScreenEdgePanGestureRecognizer) {
             guard gesture.state == .ended else {

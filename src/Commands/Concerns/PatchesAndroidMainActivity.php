@@ -684,6 +684,18 @@ KOTLIN,
         }
 
         @android.webkit.JavascriptInterface
+        fun setScreenAwake(enabled: Boolean) {
+            runOnUiThread {
+                if (enabled) {
+                    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+            Log.d("AndroidBridge", "Screen awake enabled=$enabled")
+        }
+
+        @android.webkit.JavascriptInterface
         fun getAppFirstInstallTime(): String {
             return try {
                 packageManager.getPackageInfo(packageName, 0).firstInstallTime.toString()
@@ -734,6 +746,18 @@ KOTLIN,
         fun setQuranVolumeNavigationEnabled(enabled: Boolean) {
             isQuranVolumeNavigationEnabled = enabled
             Log.d("AndroidBridge", "Quran volume navigation enabled=$enabled")
+        }
+
+        @android.webkit.JavascriptInterface
+        fun setScreenAwake(enabled: Boolean) {
+            runOnUiThread {
+                if (enabled) {
+                    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+            Log.d("AndroidBridge", "Screen awake enabled=$enabled")
         }
 
         @android.webkit.JavascriptInterface
