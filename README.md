@@ -21,7 +21,10 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Adds Android bridge method `getAppFirstInstallTime()` so WebView-side state can detect reinstall fingerprints and reset stale Quran reader local storage when Android restores old WebView data.
 - Adds Android bridge method `restartApplication()` so WebView flows can request a full native app restart (finish + process exit + relaunch intent) after first-run Quran data bootstrap.
 - Adds Android bridge method `setScreenAwake(boolean)` so WebView readers can toggle `FLAG_KEEP_SCREEN_ON` only while immersive reading is active.
-- Adds iOS WebKit bridge handler `screenAwake` so WebView readers can toggle `UIApplication.shared.isIdleTimerDisabled` while immersive reading is active.
+- Adds iOS WebKit bridge handlers `screenAwake`, `quranVolumeNavigation`, `restartApplication`, `exitApplication`, and `copyText` so WebView readers can toggle `UIApplication.shared.isIdleTimerDisabled`, opt into volume-button navigation, request a persistent-runtime reboot + WebView reload after Quran bootstrap completes, write directly to `UIPasteboard`, and let web-level back gestures exit the app on the main menu.
+- Keeps the iOS Quran volume bridge anchored with a hidden `MPVolumeView` so output-volume KVO stays responsive when hardware volume keys are repurposed for reader navigation.
+- Makes the iOS restart bridge always post a WebView reload notification after the runtime reboot attempt so the restart flow does not depend on a single success path.
+- Makes the iOS injected helper and native web view treat Return / Escape / Backspace and the left-edge swipe as native back actions when no editable field is focused, and honors the app-level `"exit"` fallback on the iOS main menu instead of swallowing it.
 - Patches Android `AndroidManifest.xml` + backup rule XMLs to disable cloud/device-transfer backup for app storage domains, preventing restored stale WebView/localStorage reader state after uninstall/reinstall.
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, while preserving NativePHP 3.2 request-id forwarding (`X-NativePHP-Req-Id`) used by Android POST body replay.
 - Keeps `WebViewManager.kt` request inspector hooks and noisy per-request logging debug-aware, reducing release-build interception/log overhead without removing request capture compatibility.
@@ -38,7 +41,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Emits a concise Android runtime environment summary in `logcat` for queue + endpoint variables after NativePHP environment setup, so local broadcast endpoint issues are visible without digging through bundled files.
 - Patches `PHPQueueWorker.kt` to run `queue:work` in verbose mode and log queue command output, making native snapshot/import failures visible during Android debugging.
 - Keeps Android `LaravelEnvironment.kt` summary logging idempotent across repeated patch runs.
-- Patches iOS `ContentView.swift` to keep Muttasiq's edge-swipe back handling aligned with the app's in-web navigation behavior, while warning if upstream system UI layout expectations change.
+- Patches iOS `ContentView.swift` to keep Muttasiq's edge-swipe back handling aligned with the app's in-web navigation behavior, expose an `AndroidBridge` shim for screen-awake / Quran volume / restart / exit / clipboard flows, aggressively suppress non-editable iOS WebKit text selection and callouts, and warn if upstream system UI layout expectations change.
 - Patches iOS `NativePHPApp.swift` and `AppUpdateManager.swift` so native startup and app updates stay on sqlite and use the app-specific bootstrap command instead of raw `migrate --force`.
 - Patches `MainActivity.kt` with a small JavaScript bridge so Muttasiq can opt into Quran page navigation via the Android hardware volume buttons.
 - Keeps patch anchors tolerant of upstream engine refactors where possible, including Compose modifier-chain changes in `MainActivity.kt`.
@@ -53,7 +56,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-system-ui`: includes Android bridge exposure of `getAppFirstInstallTime()` for native reinstall fingerprinting on the WebView side.
 - `native-system-ui`: includes Android bridge exposure of `restartApplication()` for app-driven full restart flows after native Quran bootstrap completion.
 - `native-system-ui`: includes Android bridge exposure of `setScreenAwake(boolean)` to control `FLAG_KEEP_SCREEN_ON` from WebView reader lifecycles.
-- `native-ios-back`: includes iOS `screenAwake` WebKit message handler and injected JS bridge (`window.AndroidBridge.setScreenAwake`) to control `isIdleTimerDisabled` from WebView reader lifecycles.
+- `native-ios-back`: includes iOS `screenAwake`, `quranVolumeNavigation`, `restartApplication`, `exitApplication`, and `copyText` WebKit message handlers plus injected JS bridge methods (`window.AndroidBridge.setScreenAwake`, `setQuranVolumeNavigationEnabled`, `restartApplication`, `exitApplication`, `copyText`) to control reader lifecycles and clipboard writes from the WebView.
 - `native-back-handler`: upgrades native back button delegation so it first closes any open Filament modal in the WebView, then falls back to app navigation logic.
 - `native-back-handler`: includes close-button fallback dispatch for Filament modals to ensure hardware back consumes open modals before view navigation.
 - `native-back-handler`: includes explicit root-hash (`#main-menu` / `#`) exit fallback so Android system back quits the app when web navigation is already at the main menu.

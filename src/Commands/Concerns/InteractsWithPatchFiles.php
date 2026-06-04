@@ -218,11 +218,22 @@ trait InteractsWithPatchFiles
             return false;
         }
 
-        if (! str_contains($text, $after)) {
+        $anchor = rtrim($after, "\r\n");
+        if ($anchor === '') {
             throw new RuntimeException("import anchor not found for {$label}");
         }
 
-        $text = $this->replaceFirst($text, $after, $after."\n".$importLine);
+        if (! preg_match('/^'.preg_quote($anchor, '/').'$/m', $text)) {
+            throw new RuntimeException("import anchor not found for {$label}");
+        }
+
+        $pattern = '/^'.preg_quote($anchor, '/').'$/m';
+        $updated = preg_replace($pattern, $anchor."\n".$importLine, $text, 1, $count);
+        if ($updated === null || $count < 1) {
+            throw new RuntimeException("import anchor not found for {$label}");
+        }
+
+        $text = $updated;
 
         return true;
     }
