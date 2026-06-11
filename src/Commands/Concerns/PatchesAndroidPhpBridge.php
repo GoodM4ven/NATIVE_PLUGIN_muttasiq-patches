@@ -175,6 +175,25 @@ KOTLIN;
             );
         $changed = $changed || $updated;
 
+$ensureRuntimeInitializedBody = <<<'KOTLIN'
+synchronized(this) {
+    if (!runtimeInitialized) {
+        val threadName = Thread.currentThread().name
+        Log.i(TAG, "Initializing PHP runtime on thread=$threadName")
+        nativeRuntimeInit()
+        runtimeInitialized = true
+        Log.i(TAG, "PHP runtime initialized on thread=$threadName")
+    }
+}
+KOTLIN;
+
+        [$text, $updated] = $this->setKotlinFunctionBody(
+            $text,
+            'ensureRuntimeInitialized',
+            $ensureRuntimeInitializedBody,
+        );
+        $changed = $changed || $updated;
+
         $this->writePatchResult($path, $text, $changed, 'native-persistent-runtime-guard');
     }
 }

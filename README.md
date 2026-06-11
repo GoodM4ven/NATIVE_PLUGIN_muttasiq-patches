@@ -16,6 +16,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 
 - Applies the required `EDGE` patches in `nativephp/mobile` so empty navigation components are not rendered and nested native component trees are preserved correctly.
 - Patches `MainActivity.kt` to improve system bars, `safe-area` injection, native back handling, and WebView state behavior.
+- Launches Android emulators with a Linux-safe software-rendered GPU default (`-gpu swiftshader_indirect`) unless overridden through `NATIVEPHP_ANDROID_EMULATOR_ARGS`, avoiding the Vulkan/ZINK startup failure that can block `native:run android`.
 - Adds Android splash-timing guard so warm launches keep splash visible for a short minimum duration (~1.6s floor), and harmonizes splash backdrop color with dark/light system theme to reduce startup flash.
 - Adds Android Quran startup lifecycle tracing from `MainActivity.kt` (`onResume` / `onPause`) to both `logcat` and in-WebView custom events (`quran-native-lifecycle`) for debugging reader boot visibility/calibration issues.
 - Adds Android bridge method `getAppFirstInstallTime()` so WebView-side state can detect reinstall fingerprints and reset stale Quran reader local storage when Android restores old WebView data.
@@ -28,7 +29,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Patches Android `AndroidManifest.xml` + backup rule XMLs to disable cloud/device-transfer backup for app storage domains, preventing restored stale WebView/localStorage reader state after uninstall/reinstall.
 - Patches `WebViewManager.kt` to install early request capture for `Livewire` and `Filament`, while preserving NativePHP 3.2 request-id forwarding (`X-NativePHP-Req-Id`) used by Android POST body replay.
 - Keeps `WebViewManager.kt` request inspector hooks and noisy per-request logging debug-aware, reducing release-build interception/log overhead without removing request capture compatibility.
-- Patches `PHPBridge.kt` to validate that persistent runtime boot is actually usable before enabling persistent mode, and auto-fallbacks to classic request handling if runtime boot state is lost.
+- Patches `PHPBridge.kt` to validate that persistent runtime boot is actually usable before enabling persistent mode, serializes `ensureRuntimeInitialized()` across concurrent caller threads, and auto-fallbacks to classic request handling if runtime boot state is lost.
 - Patches `PHPWebViewClient.kt` so Muttasiq's Quran page fonts are streamed directly from the bundled raw-data files, and binary asset misses no longer fall back through the unsafe JNI string bridge.
 - Includes route-aware Android Quran font interception for `qpc-v2-fonts`, `quran-surah-header-font`, and supported `quran-basmallah-font/*` requests so those font responses never flow through the PHP JNI string bridge.
 - Patches `LaravelEnvironment.kt` bundle extraction to stream ZIP entries directly to disk (instead of buffering large files in memory), preventing first-launch `OutOfMemoryError` during Laravel bundle extraction.
