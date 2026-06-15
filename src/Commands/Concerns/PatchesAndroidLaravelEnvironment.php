@@ -29,7 +29,7 @@ trait PatchesAndroidLaravelEnvironment
             "import kotlinx.coroutines.*\n",
         );
 
-$unzipBody = <<<'KOTLIN'
+        $unzipBody = <<<'KOTLIN'
 val unzipStartedAtMs = System.currentTimeMillis()
 var extractedEntries = 0
 var skippedEntries = 0
@@ -100,8 +100,9 @@ KOTLIN;
         [$text, $updated] = $this->setKotlinFunctionBody($text, 'unzip', $unzipBody);
         $changed = $changed || $updated;
 
-$runBaseArtisanCommandsBody = <<<'KOTLIN'
+        $runBaseArtisanCommandsBody = <<<'KOTLIN'
 val bootstrapStartedAtMs = System.currentTimeMillis()
+phpBridge.ensureRuntimeInitialized()
 val dbFile = File(appStorageDir, "persisted_data/database/database.sqlite")
 dbFile.parentFile?.mkdirs()
 
