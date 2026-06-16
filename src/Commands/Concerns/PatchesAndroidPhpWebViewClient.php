@@ -149,8 +149,9 @@ return resolveBundledQpcFontFile(cleanPath)
 KOTLIN;
 
         $resolveBundledQpcFontFileBody = <<<'KOTLIN'
-val match = Regex("^qpc-v2-fonts/(\\d+)\\.(?:ttf|woff2)$").matchEntire(cleanPath) ?: return null
-val pageNumber = match.groupValues.getOrNull(1)?.toIntOrNull() ?: return null
+val pageNumber = Regex("^qpc-v2-fonts/(\\d+)\\.(?:ttf|woff2)$").matchEntire(cleanPath)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    ?: Regex("^vendor/arabicable/qpc-v2/p(\\d+)\\.(?:ttf|woff2)$").matchEntire(cleanPath)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    ?: return null
 
 if (pageNumber !in 1..604) {
     return null
@@ -166,16 +167,32 @@ val candidatePaths = listOf(
     "$laravelRootPath/vendor/goodm4ven/arabicable/resources/raw-data/quran/fonts/qpc-v2/p$pageNumber.ttf",
 )
 
-candidatePaths.firstOrNull { File(it).exists() }?.let { existingPath ->
-    val fontFile = File(existingPath)
-    val mimeType = guessMimeType(fontFile.name)
+// The page-font resolver also publishes a static copy under public/vendor/arabicable/qpc-v2/
+// for fast direct-file serving (see resolveBundledAssetFile). If that published copy ever goes
+// missing or out of sync (storage pressure, app-update reset, stale client-side font URL cache),
+// this bundled raw-data lookup is the only remaining path back to the correct page glyphs, since
+// isBinaryAssetPath() blocks the PHP fallback for missing binary assets. Resolving here directly
+// from the immutable bundled tree (and re-publishing opportunistically) makes the page font
+// self-healing without ever needing to fall through to PHP.
+val bundledFontFile = candidatePaths.firstOrNull { File(it).exists() }?.let { File(it) } ?: return null
 
-    Log.d(TAG, "🕋 Resolved QPC page font directly from bundle: ${fontFile.absolutePath}")
+Log.d(TAG, "🕋 Resolved QPC page font directly from bundle: ${bundledFontFile.absolutePath}")
 
-    return Pair(fontFile, mimeType)
+try {
+    val publishedAssetFile = File(
+        "$laravelRootPath/public/vendor/arabicable/qpc-v2/p$pageNumber.${bundledFontFile.extension}",
+    )
+
+    if (!publishedAssetFile.exists()) {
+        publishedAssetFile.parentFile?.mkdirs()
+        bundledFontFile.copyTo(publishedAssetFile, overwrite = true)
+        Log.d(TAG, "🩹 Re-published stale QPC page font: ${publishedAssetFile.absolutePath}")
+    }
+} catch (e: Exception) {
+    Log.w(TAG, "⚠️ Unable to re-publish QPC page font for page $pageNumber", e)
 }
 
-return null
+return Pair(bundledFontFile, guessMimeType(bundledFontFile.name))
 KOTLIN;
 
         $resolveBundledQuranRouteAssetBody = <<<'KOTLIN'
