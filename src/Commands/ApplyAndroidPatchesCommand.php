@@ -11,6 +11,7 @@ use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidMainActivity;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidPhpBridge;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidPhpQueueWorker;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidPhpWebViewClient;
+use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidSecureStorage;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesAndroidWebViewManager;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesEdgeComponents;
 use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
@@ -26,6 +27,7 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
     use PatchesAndroidPhpBridge;
     use PatchesAndroidPhpQueueWorker;
     use PatchesAndroidPhpWebViewClient;
+    use PatchesAndroidSecureStorage;
     use PatchesAndroidWebViewManager;
     use PatchesEdgeComponents;
 
@@ -175,6 +177,15 @@ class ApplyAndroidPatchesCommand extends NativePluginHookCommand
         $phpBridgePath = $buildPath.'/app/src/main/java/com/nativephp/mobile/bridge/PHPBridge.kt';
         try {
             $this->patchPhpBridge($phpBridgePath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
+        $androidPluginsRegistrationPath = $buildPath.'/app/src/main/java/com/nativephp/mobile/bridge/plugins/PluginBridgeFunctionRegistration.kt';
+        $androidSecureStorageFunctionsPath = $buildPath.'/app/src/main/java/com/nativephp/mobile/bridge/plugins/functions/SecureStorageFunctions.kt';
+        try {
+            $this->patchAndroidSecureStorage($androidPluginsRegistrationPath, $androidSecureStorageFunctionsPath);
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
             $hadErrors = true;

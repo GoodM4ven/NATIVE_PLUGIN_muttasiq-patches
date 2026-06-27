@@ -1,7 +1,7 @@
 {
     "namespace": "MuttasiqPatches",
     "hooks": {
-        "pre_compile": "nativephp:muttasiq:patches"
+        "post_compile": "nativephp:muttasiq:patches"
     },
     "android": {
         "min_version": 26

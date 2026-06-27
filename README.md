@@ -22,6 +22,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - Adds Android bridge method `getAppFirstInstallTime()` so WebView-side state can detect reinstall fingerprints and reset stale Quran reader local storage when Android restores old WebView data.
 - Adds Android bridge method `restartApplication()` so WebView flows can request a full native app restart (finish + process exit + relaunch intent) after first-run Quran data bootstrap.
 - Adds Android bridge method `setScreenAwake(boolean)` so WebView readers can toggle `FLAG_KEEP_SCREEN_ON` only while immersive reading is active.
+- Adds native `SecureStorage` bridge implementations for Android and iOS so the app can persist device auth state without the paid NativePHP secure-storage plugin.
 - Adds iOS WebKit bridge handlers `screenAwake`, `quranVolumeNavigation`, `restartApplication`, `exitApplication`, and `copyText` so WebView readers can toggle `UIApplication.shared.isIdleTimerDisabled`, opt into volume-button navigation, request a persistent-runtime reboot + WebView reload after Quran bootstrap completes, write directly to `UIPasteboard`, and let web-level back gestures exit the app on the main menu.
 - Keeps the iOS Quran volume bridge anchored with a hidden `MPVolumeView` so output-volume KVO stays responsive when hardware volume keys are repurposed for reader navigation.
 - Makes the iOS restart bridge always post a WebView reload notification after the runtime reboot attempt so the restart flow does not depend on a single success path.
@@ -59,6 +60,7 @@ An internal package for **[Muttasiq](https://github.com/GoodM4ven/NATIVE_TALL_mu
 - `native-system-ui`: includes Android bridge exposure of `getAppFirstInstallTime()` for native reinstall fingerprinting on the WebView side.
 - `native-system-ui`: includes Android bridge exposure of `restartApplication()` for app-driven full restart flows after native Quran bootstrap completion.
 - `native-system-ui`: includes Android bridge exposure of `setScreenAwake(boolean)` to control `FLAG_KEEP_SCREEN_ON` from WebView reader lifecycles.
+- `native-secure-storage`: registers `SecureStorage.Set`, `SecureStorage.Get`, and `SecureStorage.Delete` bridge functions on Android and iOS using encrypted local storage.
 - `native-ios-back`: includes iOS `screenAwake`, `quranVolumeNavigation`, `restartApplication`, `exitApplication`, and `copyText` WebKit message handlers plus injected JS bridge methods (`window.AndroidBridge.setScreenAwake`, `setQuranVolumeNavigationEnabled`, `restartApplication`, `exitApplication`, `copyText`) to control reader lifecycles and clipboard writes from the WebView.
 - `native-back-handler`: upgrades native back button delegation so it first closes any open Filament modal in the WebView, then falls back to app navigation logic.
 - `native-back-handler`: includes close-button fallback dispatch for Filament modals to ensure hardware back consumes open modals before view navigation.

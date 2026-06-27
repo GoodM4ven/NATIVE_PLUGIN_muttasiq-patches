@@ -9,6 +9,7 @@ use Goodm4ven\NativePatches\Commands\Concerns\PatchesEdgeComponents;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosAppUpdateManager;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosContentView;
 use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosNativePhpApp;
+use Goodm4ven\NativePatches\Commands\Concerns\PatchesIosSecureStorage;
 use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
 use RuntimeException;
 
@@ -19,6 +20,7 @@ class ApplyIosPatchesCommand extends NativePluginHookCommand
     use PatchesIosAppUpdateManager;
     use PatchesIosContentView;
     use PatchesIosNativePhpApp;
+    use PatchesIosSecureStorage;
 
     protected $signature = 'nativephp:muttasiq:patches-ios';
 
@@ -75,6 +77,16 @@ class ApplyIosPatchesCommand extends NativePluginHookCommand
 
         try {
             $this->patchIosAppUpdateManager($appUpdateManagerPath);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+            $hadErrors = true;
+        }
+
+        $iosPluginsRegistrationPath = $buildPath.'/NativePHP/Bridge/Plugins/PluginBridgeFunctionRegistration.swift';
+        $iosSecureStorageFunctionsPath = $buildPath.'/NativePHP/Bridge/Functions/SecureStorageFunctions.swift';
+
+        try {
+            $this->patchIosSecureStorage($iosPluginsRegistrationPath, $iosSecureStorageFunctionsPath);
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
             $hadErrors = true;
