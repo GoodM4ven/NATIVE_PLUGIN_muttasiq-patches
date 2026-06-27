@@ -187,6 +187,48 @@ KOTLIN,
         $changed = $this->replaceOnceOrError(
             $text,
             <<<'KOTLIN'
+                if (url.startsWith("nativephp://")) {
+                    Log.d("WebView", "🔗 Intercepted deep link inside WebView: $url")
+
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: ActivityNotFoundException) {
+                        Toast.makeText(context, "No app can handle this link", Toast.LENGTH_SHORT).show()
+                    }
+
+                    return true // prevent WebView from loading it
+                }
+KOTLIN,
+            <<<'KOTLIN'
+                val deepLinkScheme = request.url.scheme?.lowercase()
+                val isCustomDeepLink = deepLinkScheme != null &&
+                    deepLinkScheme !in listOf("http", "https", "tel", "mailto", "sms", "geo", "file", "content", "javascript", "about", "blob")
+
+                if (isCustomDeepLink) {
+                    Log.d("WebView", "🔗 Intercepted deep link inside WebView: $url")
+
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: ActivityNotFoundException) {
+                        Toast.makeText(context, "No app can handle this link", Toast.LENGTH_SHORT).show()
+                    }
+
+                    return true // prevent WebView from loading it
+                }
+KOTLIN,
+            'custom scheme deep link handling',
+            'if (url.startsWith("nativephp://"))',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            <<<'KOTLIN'
                 Log.d(TAG, "🔄 Intercepting $method request to $url")
 
                 request.requestHeaders.forEach { (key, value) ->
