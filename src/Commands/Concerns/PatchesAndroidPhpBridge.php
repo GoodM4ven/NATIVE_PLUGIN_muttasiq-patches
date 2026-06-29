@@ -23,7 +23,51 @@ trait PatchesAndroidPhpBridge
 
         $changed = false;
 
-$bootPersistentRuntimeBody = <<<'KOTLIN'
+        // Muttasiq: make the PHP runtime thread + init flag process-wide.
+        //
+        // Upstream gives every PHPBridge instance its own newSingleThreadExecutor()
+        // and its own `runtimeInitialized` flag. But the embedded PHP / TSRM state
+        // primed by nativeRuntimeInit() is process-global and bound to whichever OS
+        // thread first ran it. When a second PHPBridge instance is created (activity
+        // recreate / resume), it boots PHP on a different pool thread and rebinds that
+        // global state — and the first instance's still-live request thread then
+        // SIGSEGVs in ts_resource_ex+276 (via OnUpdateBool during php_tsrm_startup_ex)
+        // on its next php_embed_init. Funnel all PHP work through one shared thread and
+        // prime exactly once per process so global PHP/TSRM state is only ever touched
+        // from its owning thread.
+        $changed = $this->replaceOnceOrError(
+            $text,
+            '    private val phpExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()',
+            '    private val phpExecutor get() = sharedPhpExecutor',
+            'native-persistent-runtime-guard: shared phpExecutor',
+            'private val phpExecutor get() = sharedPhpExecutor',
+        ) || $changed;
+
+        $changed = $this->replaceOnceOrError(
+            $text,
+            "    @Volatile\n    private var runtimeInitialized = false\n\n    @Volatile\n    private var persistentMode = false",
+            "    @Volatile\n    private var persistentMode = false",
+            'native-persistent-runtime-guard: drop instance runtimeInitialized',
+            'private var sharedRuntimeInitialized = false',
+        ) || $changed;
+
+        // Anchor on the companion `init {}` (not MAX_REQUEST_AGE) and use
+        // insertBeforeOrError so re-running the patch is a no-op once the shared
+        // statics are present — a replaceOnce whose replacement re-includes its
+        // own anchor would otherwise append a duplicate block on every run.
+        $changed = $this->insertBeforeOrError(
+            $text,
+            "        init {\n            System.loadLibrary(\"php_wrapper\")",
+            "        // Muttasiq: one process-wide PHP thread + one-time init so embedded\n".
+            "        // PHP/TSRM global state is only ever touched from its owning thread,\n".
+            "        // even across multiple PHPBridge instances (activity recreate/resume).\n".
+            "        private val sharedPhpExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()\n\n".
+            "        @Volatile\n".
+            "        private var sharedRuntimeInitialized = false\n",
+            'native-persistent-runtime-guard: shared runtime statics',
+        ) || $changed;
+
+        $bootPersistentRuntimeBody = <<<'KOTLIN'
 val future = phpExecutor.submit<Boolean> {
     val start = System.currentTimeMillis()
 
@@ -74,7 +118,7 @@ KOTLIN;
         );
         $changed = $changed || $updated;
 
-$handleLaravelRequestBody = <<<'KOTLIN'
+        $handleLaravelRequestBody = <<<'KOTLIN'
 val requestStart = System.currentTimeMillis()
 
 val future = phpExecutor.submit<String> {
@@ -172,16 +216,16 @@ KOTLIN;
             $text,
             'handleLaravelRequest',
             $handleLaravelRequestBody,
-            );
+        );
         $changed = $changed || $updated;
 
-$ensureRuntimeInitializedBody = <<<'KOTLIN'
-synchronized(this) {
-    if (!runtimeInitialized) {
+        $ensureRuntimeInitializedBody = <<<'KOTLIN'
+synchronized(PHPBridge::class.java) {
+    if (!sharedRuntimeInitialized) {
         val threadName = Thread.currentThread().name
         Log.i(TAG, "Initializing PHP runtime on thread=$threadName")
         nativeRuntimeInit()
-        runtimeInitialized = true
+        sharedRuntimeInitialized = true
         Log.i(TAG, "PHP runtime initialized on thread=$threadName")
     }
 }
